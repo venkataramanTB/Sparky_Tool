@@ -1,6 +1,8 @@
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os as _os
 
 from config import get_settings
 from peoplesoft import trigger_engine
@@ -18,6 +20,10 @@ app.add_middleware(
 )
 
 _cache: dict = {}
+
+_frontend_dist = _os.path.join(_os.path.dirname(__file__), "..", "frontend", "dist")
+if _os.path.isdir(_frontend_dist):
+    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="static")
 
 
 @app.get("/api/health")
