@@ -10,7 +10,7 @@ def mock_settings(monkeypatch):
     mock.sftp_username = "user"
     mock.sftp_password = "pass"
     mock.sftp_remote_path = "/output.csv"
-    monkeypatch.setattr("sftp_client.settings", mock)
+    monkeypatch.setattr("sftp_client.get_settings", lambda: mock)
 
 
 TEST_CSV = b"name,age\nAlice,30\nBob,25"
@@ -20,7 +20,6 @@ def test_download_csv_returns_bytes():
     with patch("paramiko.SSHClient") as mock_ssh_cls:
         mock_ssh = MagicMock()
         mock_ssh_cls.return_value = mock_ssh
-
         mock_sftp = MagicMock()
         mock_ssh.open_sftp.return_value = mock_sftp
 

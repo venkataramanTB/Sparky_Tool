@@ -2,10 +2,9 @@ import io
 import paramiko
 from config import get_settings
 
-settings = get_settings()
-
 
 def download_csv() -> bytes:
+    settings = get_settings()
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:

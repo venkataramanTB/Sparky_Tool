@@ -3,11 +3,13 @@ import os as _os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from config import get_settings
 from peoplesoft import trigger_engine
 from sftp_client import download_csv
 from csv_parser import parse_and_compute
+from settings_manager import update_env
 
 settings = get_settings()
 app = FastAPI(title="Sparky Tool")
@@ -57,6 +59,47 @@ def results():
     if "last" not in _cache:
         raise HTTPException(status_code=404, detail="No results yet — run the engine first.")
     return _cache["last"]
+
+
+class SettingsPayload(BaseModel):
+    ps_base_url: str = ""
+    ps_auth_type: str = "basic"
+    ps_username: str = ""
+    ps_password: str = ""
+    ps_endpoint: str = ""
+    sftp_host: str = ""
+    sftp_port: str = "22"
+    sftp_username: str = ""
+    sftp_password: str = ""
+    sftp_remote_path: str = ""
+    cors_origins: str = "http://localhost:3000"
+
+
+@app.get("/api/settings")
+def get_settings_view():
+    s = settings
+    return {
+        "ps_base_url": s.ps_base_url,
+        "ps_auth_type": s.ps_auth_type,
+        "ps_username": s.ps_username,
+        "ps_password": "***" if s.ps_password else "",
+        "ps_endpoint": s.ps_endpoint,
+        "sftp_host": s.sftp_host,
+        "sftp_port": str(s.sftp_port),
+        "sftp_username": s.sftp_username,
+        "sftp_password": "***" if s.sftp_password else "",
+        "sftp_remote_path": s.sftp_remote_path,
+        "cors_origins": s.cors_origins,
+    }
+
+
+@app.post("/api/settings")
+def save_settings(body: SettingsPayload):
+    update_env(body.model_dump())
+    get_settings.cache_clear()
+    global settings
+    settings = get_settings()
+    return {"status": "saved"}
 
 
 # Must be registered AFTER all API routes so /api/* is not shadowed

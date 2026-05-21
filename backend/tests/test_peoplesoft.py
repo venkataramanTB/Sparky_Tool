@@ -11,7 +11,7 @@ def mock_settings(monkeypatch):
     mock.ps_username = "user"
     mock.ps_password = "pass"
     mock.ps_endpoint = "/api/query"
-    monkeypatch.setattr("peoplesoft.settings", mock)
+    monkeypatch.setattr("peoplesoft.get_settings", lambda: mock)
     return mock
 
 
