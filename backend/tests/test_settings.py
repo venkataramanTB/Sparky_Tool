@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 
@@ -9,6 +9,7 @@ SETTINGS_PAYLOAD = {
     "ps_username": "newuser",
     "ps_password": "newpass",
     "ps_endpoint": "/api/new",
+    "ps_process_name": "APPR_CLD_AE",
     "sftp_host": "sftp.new.com",
     "sftp_port": "22",
     "sftp_username": "sftpuser",
@@ -20,6 +21,7 @@ SETTINGS_PAYLOAD = {
 
 @pytest.fixture()
 def client():
+    # yield inside the patch context so the mock stays alive during the test
     with patch("main.settings") as mock_settings:
         mock_settings.cors_origins = "http://localhost:3000"
         mock_settings.ps_base_url = "https://ps.example.com"
@@ -27,13 +29,14 @@ def client():
         mock_settings.ps_username = "user"
         mock_settings.ps_password = "secret"
         mock_settings.ps_endpoint = "/api/query"
+        mock_settings.ps_process_name = "APPR_CLD_AE"
         mock_settings.sftp_host = "sftp.example.com"
         mock_settings.sftp_port = 22
         mock_settings.sftp_username = "sftpuser"
         mock_settings.sftp_password = "sftppass"
         mock_settings.sftp_remote_path = "/output.csv"
         from main import app
-        return TestClient(app)
+        yield TestClient(app)
 
 
 def test_get_settings_returns_masked_passwords(client):
@@ -43,6 +46,7 @@ def test_get_settings_returns_masked_passwords(client):
     assert "ps_base_url" in data
     assert data["ps_password"] == "***"
     assert data["sftp_password"] == "***"
+    assert data["ps_process_name"] == "APPR_CLD_AE"
 
 
 def test_post_settings_calls_update_env(client):

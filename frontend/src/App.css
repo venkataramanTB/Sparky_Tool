@@ -1,9 +1,18 @@
-.app { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
-header h1 { font-size: 1.8rem; color: #0055aa; }
-.run-button { padding: 0.6rem 1.4rem; background: #0055aa; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
-.run-button:disabled { background: #aaa; cursor: not-allowed; }
-.spinner { padding: 1rem; color: #666; font-style: italic; }
-.error-banner { background: #ffeaea; border: 1px solid #f88; padding: 1rem; border-radius: 6px; color: #c00; margin-bottom: 1rem; }
-section { background: #fff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-section h2 { margin-bottom: 1rem; color: #333; }
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Raleway:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body {
+  background-color: #0b0c0e;
+  margin: 0;
+  padding: 0;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #0b0c0e; }
+::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.18); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.35); }
+
+::selection { background: rgba(201,168,76,0.2); color: #ede8d0; }

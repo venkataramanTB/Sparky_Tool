@@ -8,6 +8,7 @@ vi.mock('recharts', () => ({
   YAxis: () => null,
   Tooltip: () => null,
   Legend: () => null,
+  CartesianGrid: () => null,
   PieChart: ({ children }) => <div data-testid="pie-chart">{children}</div>,
   Pie: () => null,
   Cell: () => null,
@@ -33,5 +34,5 @@ test('renders pie chart for categorical columns', () => {
 
 test('shows categorical column name as section heading', () => {
   render(<Charts kpis={kpis} />)
-  expect(screen.getByText('dept Distribution')).toBeInTheDocument()
+  expect(screen.getByText('dept — Distribution')).toBeInTheDocument()
 })

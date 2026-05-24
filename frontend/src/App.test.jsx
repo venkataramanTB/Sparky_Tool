@@ -1,37 +1,66 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { vi } from 'vitest'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { vi, beforeEach, afterEach } from 'vitest'
 import App from './App'
 import * as api from './api'
 
-// recharts uses ResizeObserver which jsdom doesn't support — mock the whole module
 vi.mock('recharts', () => ({
   BarChart: ({ children }) => <div>{children}</div>,
   Bar: () => null, XAxis: () => null, YAxis: () => null,
-  Tooltip: () => null, Legend: () => null,
+  Tooltip: () => null, Legend: () => null, CartesianGrid: () => null,
   PieChart: ({ children }) => <div>{children}</div>,
   Pie: () => null, Cell: () => null,
   ResponsiveContainer: ({ children }) => <div>{children}</div>,
 }))
 
-test('renders Run Engine button', () => {
-  render(<App />)
-  expect(screen.getByText('Run Engine')).toBeInTheDocument()
+// Pass the health check immediately in all tests unless a test overrides it
+beforeEach(() => {
+  vi.spyOn(api, 'checkHealth').mockResolvedValue({ data: { status: 'ok' } })
 })
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+// ── Startup screen ────────────────────────────────────────────────────────────
+
+test('shows startup screen while health check is pending', () => {
+  vi.spyOn(api, 'checkHealth').mockImplementation(() => new Promise(() => {}))
+  render(<App />)
+  expect(screen.getByText('Connecting to backend…')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /run engine/i })).not.toBeInTheDocument()
+})
+
+test('shows error state when all health check attempts fail', async () => {
+  vi.useFakeTimers()
+  vi.spyOn(api, 'checkHealth').mockRejectedValue(new Error('network error'))
+  render(<App />)
+  await act(async () => { await vi.runAllTimersAsync() })
+  expect(screen.getByText(/Cannot reach the backend/i)).toBeInTheDocument()
+})
+
+test('renders main UI after health check passes', async () => {
+  render(<App />)
+  await waitFor(() => expect(screen.getByRole('button', { name: /run engine/i })).toBeInTheDocument())
+})
+
+// ── Main app ──────────────────────────────────────────────────────────────────
 
 test('disables button and shows loading text while running', async () => {
   vi.spyOn(api, 'runEngine').mockImplementation(() => new Promise(() => {}))
   render(<App />)
-  fireEvent.click(screen.getByText('Run Engine'))
+  await waitFor(() => screen.getByRole('button', { name: /run engine/i }))
+  fireEvent.click(screen.getByRole('button', { name: /run engine/i }))
   expect(screen.getByText('Running...')).toBeInTheDocument()
-  expect(screen.getByRole('button')).toBeDisabled()
+  expect(screen.getByRole('button', { name: /running/i, hidden: true })).toBeDisabled()
 })
 
-test('shows error banner on failure', async () => {
+test('shows error banner on run failure', async () => {
   vi.spyOn(api, 'runEngine').mockRejectedValue({
-    response: { data: { detail: 'PeopleSoft error: 502' } }
+    response: { data: { detail: 'PeopleSoft error: 502' } },
   })
   render(<App />)
-  fireEvent.click(screen.getByText('Run Engine'))
+  await waitFor(() => screen.getByRole('button', { name: /run engine/i }))
+  fireEvent.click(screen.getByRole('button', { name: /run engine/i }))
   await waitFor(() => expect(screen.getByText('PeopleSoft error: 502')).toBeInTheDocument())
 })
 
@@ -42,13 +71,14 @@ test('renders dashboard sections on success', async () => {
       columns: ['name', 'age'],
       rows: [{ name: 'Alice', age: 30 }],
       kpis: {
-        age: { type: 'numeric', count: 1, sum: 30, mean: 30, min: 30, max: 30 },
-        name: { type: 'categorical', count: 1, unique_count: 1, value_counts: { Alice: 1 } }
-      }
-    }
+        age:  { type: 'numeric',      count: 1, sum: 30, mean: 30, min: 30, max: 30 },
+        name: { type: 'categorical',  count: 1, unique_count: 1, value_counts: { Alice: 1 } },
+      },
+    },
   })
   render(<App />)
-  fireEvent.click(screen.getByText('Run Engine'))
+  await waitFor(() => screen.getByRole('button', { name: /run engine/i }))
+  fireEvent.click(screen.getByRole('button', { name: /run engine/i }))
   await waitFor(() => expect(screen.getByText('KPIs')).toBeInTheDocument())
   expect(screen.getByText('Charts')).toBeInTheDocument()
   expect(screen.getByText(/Data \(1 rows\)/)).toBeInTheDocument()

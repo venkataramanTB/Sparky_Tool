@@ -1,56 +1,56 @@
-import { useState } from 'react'
-import { runEngine } from './api'
-import KPICards from './components/KPICards'
-import Charts from './components/Charts'
-import DataTable from './components/DataTable'
-import './App.css'
+import { useState, useEffect, useCallback } from 'react'
+import { Box, CircularProgress } from '@mui/material'
+import StartupScreen from './components/StartupScreen'
+import Sidebar from './components/Sidebar'
+import Dashboard from './pages/Dashboard'
+import Settings from './pages/Settings'
+import Admin from './pages/Admin'
+import SignInPage from './pages/SignIn'
+import { useAuth } from './AuthContext'
+
+const VALID_ROUTES = ['dashboard', 'settings', 'admin']
+
+function getRoute() {
+  const h = window.location.hash.slice(1)
+  return VALID_ROUTES.includes(h) ? h : 'dashboard'
+}
 
 export default function App() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [ready, setReady] = useState(false)
+  const [route, setRoute] = useState(getRoute)
+  const { user, loading, signOut } = useAuth()
 
-  const handleRun = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await runEngine()
-      setData(res.data)
-    } catch (err) {
-      setError(err.response?.data?.detail ?? 'Unexpected error — check the console.')
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    const handler = () => setRoute(getRoute())
+    window.addEventListener('hashchange', handler)
+    return () => window.removeEventListener('hashchange', handler)
+  }, [])
+
+  const navigate = useCallback((to) => {
+    window.location.hash = to
+    setRoute(to)
+  }, [])
+
+  if (!ready) return <StartupScreen onReady={() => setReady(true)} />
+
+  if (loading) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#0b0c0e' }}>
+        <CircularProgress size={28} sx={{ color: '#c9a84c' }} />
+      </Box>
+    )
   }
 
+  if (!user) return <SignInPage />
+
   return (
-    <div className="app">
-      <header>
-        <h1>Sparky Tool</h1>
-        <button className="run-button" onClick={handleRun} disabled={loading}>
-          {loading ? 'Running...' : 'Run Engine'}
-        </button>
-      </header>
-
-      {loading && <div className="spinner">Waiting for PeopleSoft engine to complete...</div>}
-      {error && <div className="error-banner">{error}</div>}
-
-      {data && (
-        <>
-          <section>
-            <h2>KPIs</h2>
-            <KPICards kpis={data.kpis} />
-          </section>
-          <section>
-            <h2>Charts</h2>
-            <Charts kpis={data.kpis} />
-          </section>
-          <section>
-            <h2>Data ({data.row_count} rows)</h2>
-            <DataTable rows={data.rows} columns={data.columns} />
-          </section>
-        </>
-      )}
-    </div>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#0b0c0e' }}>
+      <Sidebar route={route} navigate={navigate} user={user} onSignOut={signOut} />
+      <Box sx={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+        {route === 'dashboard' && <Dashboard />}
+        {route === 'settings' && <Settings />}
+        {route === 'admin'    && <Admin />}
+      </Box>
+    </Box>
   )
 }

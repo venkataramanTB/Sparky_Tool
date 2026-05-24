@@ -5,6 +5,8 @@ ENV_PATH = Path(__file__).parent / ".env"
 
 ALLOWED_KEYS = {
     "ps_base_url", "ps_auth_type", "ps_username", "ps_password", "ps_endpoint",
+    "ps_status_endpoint", "ps_process_name",
+    "retrieval_method",
     "sftp_host", "sftp_port", "sftp_username", "sftp_password", "sftp_remote_path",
     "cors_origins",
 }

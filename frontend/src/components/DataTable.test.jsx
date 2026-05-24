@@ -23,7 +23,7 @@ test('renders column headers', () => {
 
 test('filters rows on search input', () => {
   render(<DataTable rows={rows} columns={columns} />)
-  const search = screen.getByPlaceholderText('Search...')
+  const search = screen.getByPlaceholderText('Search records…')
   fireEvent.change(search, { target: { value: 'Alice' } })
   expect(screen.getByText('Alice')).toBeInTheDocument()
   expect(screen.queryByText('Bob')).not.toBeInTheDocument()
@@ -31,5 +31,5 @@ test('filters rows on search input', () => {
 
 test('shows row count', () => {
   render(<DataTable rows={rows} columns={columns} />)
-  expect(screen.getByText(/3 rows/i)).toBeInTheDocument()
+  expect(screen.getByText(/3 RECORDS/i)).toBeInTheDocument()
 })

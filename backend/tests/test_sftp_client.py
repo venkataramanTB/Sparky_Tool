@@ -44,6 +44,24 @@ def test_download_csv_closes_connection_on_success():
         mock_ssh.close.assert_called_once()
 
 
+def test_download_csv_uses_explicit_remote_path():
+    with patch("paramiko.SSHClient") as mock_ssh_cls:
+        mock_ssh = MagicMock()
+        mock_ssh_cls.return_value = mock_ssh
+        mock_sftp = MagicMock()
+        mock_ssh.open_sftp.return_value = mock_sftp
+
+        def fake_getfo(path, buf):
+            buf.write(TEST_CSV)
+
+        mock_sftp.getfo.side_effect = fake_getfo
+
+        from sftp_client import download_csv
+        download_csv(remote_path="/explicit/path.csv")
+        called_path = mock_sftp.getfo.call_args[0][0]
+        assert called_path == "/explicit/path.csv"
+
+
 def test_download_csv_closes_connection_on_error():
     with patch("paramiko.SSHClient") as mock_ssh_cls:
         mock_ssh = MagicMock()

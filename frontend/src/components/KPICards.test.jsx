@@ -13,11 +13,13 @@ test('renders a card for each numeric column', () => {
 
 test('shows count, sum, avg, min, max for numeric columns', () => {
   render(<KPICards kpis={kpis} />)
-  expect(screen.getByText('Count: 3')).toBeInTheDocument()
-  expect(screen.getByText('Sum: 90.00')).toBeInTheDocument()
-  expect(screen.getByText('Avg: 30.00')).toBeInTheDocument()
-  expect(screen.getByText('Min: 25.00')).toBeInTheDocument()
-  expect(screen.getByText('Max: 35.00')).toBeInTheDocument()
+  // New design: label and value are separate elements; avg is the large hero number
+  expect(screen.getByText('3')).toBeInTheDocument()       // count
+  expect(screen.getByText('90.00')).toBeInTheDocument()   // sum
+  expect(screen.getByText('30.00')).toBeInTheDocument()   // avg (hero)
+  // min/max appear in both the range bar labels and the colored boxes
+  expect(screen.getAllByText('25.00').length).toBeGreaterThan(0)
+  expect(screen.getAllByText('35.00').length).toBeGreaterThan(0)
 })
 
 test('does not render categorical columns as KPI cards', () => {
