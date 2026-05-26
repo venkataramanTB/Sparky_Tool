@@ -10,12 +10,15 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      // Allow cross-origin requests to the Vite dev server itself.
+      cors: true,
       // Dev proxy: rewrites /api → backend.
       // Change BACKEND_URL in .env to point at a different local port or staging URL.
       proxy: {
         '/api': {
           target: env.BACKEND_URL || 'http://localhost:8000',
           changeOrigin: true,
+          headers: { 'Access-Control-Allow-Origin': '*' },
         },
       },
     },
