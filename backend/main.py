@@ -49,7 +49,7 @@ _v2_enabled = False
 
 # ── v2 routers ────────────────────────────────────────────────────────────────
 try:
-    from routers import users as _u, configs as _c, runs as _r, admin as _a
+    from routers import users as _u, configs as _c, runs as _r, admin as _a, insights as _i
     from database import get_db
     from models import UserConfig, RunLog, AuditEvent
     from auth import get_current_user
@@ -59,6 +59,7 @@ try:
     app.include_router(_c.router)
     app.include_router(_r.router)
     app.include_router(_a.router)
+    app.include_router(_i.router)
     _v2_enabled = True
 
     def _config_to_ns(config: UserConfig) -> SimpleNamespace:
@@ -76,6 +77,16 @@ try:
             sftp_username=config.sftp_username or "",
             sftp_password=decrypt(config.sftp_password_enc),
             sftp_remote_path=config.sftp_remote_path or "",
+            # Windows Server (WinRM) retrieval
+            win_host=config.win_host or "",
+            win_port=config.win_port or 5985,
+            win_username=config.win_username or "",
+            win_password=decrypt(config.win_password_enc) if config.win_password_enc else "",
+            win_use_ssl=config.win_use_ssl or False,
+            win_auth_type=config.win_auth_type or "ntlm",
+            win_connection_type=config.win_connection_type or "winrm",
+            win_share=config.win_share or "C$",
+            win_domain=config.win_domain or "",
         )
 
     from sqlalchemy.orm import Session
@@ -109,21 +120,38 @@ try:
                  run_log.id, config_id, config.name, user.id[:8], s.ps_process_name, s.retrieval_method)
 
         start = _time.time()
+        instance_id = ""
+        report_id   = ""
         try:
             # ── Step 1: Trigger PeopleSoft ──────────────────────────────────
             t1 = _time.time()
             try:
                 trigger_result = trigger_engine(_settings=s)
             except httpx.HTTPStatusError as exc:
-                raise HTTPException(502, f"PeopleSoft error: {exc}")
+                run_log.failed_step = "trigger"
+                raise HTTPException(502, f"PeopleSoft API error: {exc}")
             except httpx.TimeoutException:
-                raise HTTPException(504, "PeopleSoft engine timed out")
+                run_log.failed_step = "trigger"
+                raise HTTPException(504, "PeopleSoft API timed out")
             except httpx.ConnectError as exc:
-                raise HTTPException(502, f"PeopleSoft unreachable: {exc}")
+                run_log.failed_step = "trigger"
+                raw = str(exc)
+                if "10061" in raw or "Connection refused" in raw:
+                    raise HTTPException(502, "PeopleSoft refused the connection — check the port in your Base URL and confirm the service is running.")
+                raise HTTPException(502, f"PeopleSoft API unreachable: {exc}")
+            except ValueError as exc:
+                run_log.failed_step = "trigger"
+                raise HTTPException(400, str(exc))
             log.info("Run %d  step=trigger  %d ms", run_log.id, round((_time.time() - t1) * 1000))
 
             instance_id = str(trigger_result.get("InstanceID", ""))
             report_id = ""
+
+            # Persist instance_id immediately so it survives any later failure
+            if instance_id:
+                run_log.instance_id = instance_id
+                db.commit()
+                log.debug("Run %d  instance_id persisted  %s", run_log.id, instance_id)
 
             # ── Step 2: Poll status ─────────────────────────────────────────
             if s.ps_status_endpoint and instance_id:
@@ -132,14 +160,26 @@ try:
                     status_result = poll_status(instance_id, _settings=s)
                     report_id = str(status_result.get("ReportID", ""))
                 except TimeoutError as exc:
+                    run_log.failed_step = "poll"
                     raise HTTPException(504, str(exc))
                 except (httpx.HTTPStatusError, httpx.ConnectError) as exc:
-                    raise HTTPException(502, f"PeopleSoft status error: {exc}")
+                    run_log.failed_step = "poll"
+                    raise HTTPException(502, f"PeopleSoft status polling error: {exc}")
                 log.info("Run %d  step=poll  instance=%s  report=%s  %d ms",
                          run_log.id, instance_id, report_id, round((_time.time() - t2) * 1000))
 
-            # ── Step 3: Download CSV (skip if SFTP not configured) ─────────
-            sftp_configured = bool(s.sftp_host and s.sftp_remote_path)
+                # Persist report_id immediately so it survives any later failure
+                if report_id:
+                    run_log.report_id = report_id
+                    db.commit()
+                    log.debug("Run %d  report_id persisted  %s", run_log.id, report_id)
+
+            # ── Step 3: Download CSV (skip if retrieval not configured) ───
+            is_windows = s.retrieval_method in ("winrm", "smb", "win_ssh")
+            sftp_configured = (
+                bool(s.win_host and s.sftp_remote_path) if is_windows
+                else bool(s.sftp_host and s.sftp_remote_path)
+            )
 
             if not sftp_configured:
                 duration_ms = int((_time.time() - start) * 1000)
@@ -189,11 +229,23 @@ try:
             try:
                 if s.retrieval_method == "scp":
                     csv_bytes = scp_client.download_csv(remote_path=remote_path, _settings=s)
+                elif s.retrieval_method == "winrm":
+                    import windows_client as _wc
+                    csv_bytes = _wc.download_csv(remote_path=remote_path, _settings=s)
+                elif s.retrieval_method == "smb":
+                    import smb_client as _smbcli
+                    csv_bytes = _smbcli.download_csv(remote_path=remote_path, _settings=s)
+                elif s.retrieval_method == "win_ssh":
+                    import win_ssh_client as _winssh
+                    csv_bytes = _winssh.download_csv(remote_path=remote_path, _settings=s)
                 else:
                     csv_bytes = sftp_client.download_csv(remote_path=remote_path, _settings=s)
             except Exception as exc:
-                label = "SSH/SCP" if s.retrieval_method == "scp" else "SFTP"
-                raise HTTPException(503, f"{label} error: {exc}")
+                label = {"scp": "SSH/SCP", "winrm": "WinRM", "smb": "SMB", "win_ssh": "SSH"}.get(
+                    s.retrieval_method, "SFTP"
+                )
+                run_log.failed_step = "download"
+                raise HTTPException(503, f"{label} download error: {exc}")
             log.info("Run %d  step=download  size=%d bytes  %d ms",
                      run_log.id, len(csv_bytes), round((_time.time() - t3) * 1000))
 
@@ -202,6 +254,7 @@ try:
             try:
                 result = parse_and_compute(csv_bytes)
             except Exception as exc:
+                run_log.failed_step = "parse"
                 raise HTTPException(422, f"CSV parse error: {exc}")
             log.info("Run %d  step=parse  rows=%d  %d ms",
                      run_log.id, result.get("row_count", 0), round((_time.time() - t4) * 1000))
@@ -239,13 +292,31 @@ try:
 
         except HTTPException as exc:
             duration_ms = int((_time.time() - start) * 1000)
-            run_log.status = "error"
+            run_log.status       = "error"
             run_log.error_detail = str(exc.detail)
-            run_log.duration_ms = duration_ms
+            run_log.duration_ms  = duration_ms
             run_log.completed_at = datetime.now(timezone.utc)
+            # Carry forward any tracking IDs captured before the failure
+            if instance_id and not run_log.instance_id:
+                run_log.instance_id = instance_id
+            if report_id and not run_log.report_id:
+                run_log.report_id = report_id
+            # failed_step is already set at the raise site; persist it now
+            db.add(AuditEvent(
+                user_id=user.id,
+                event_type="run_failed",
+                detail={
+                    "config_id":   config_id,
+                    "instance_id": instance_id or "",
+                    "report_id":   report_id or "",
+                    "failed_step": run_log.failed_step or "unknown",
+                    "error":       str(exc.detail),
+                },
+                ip_address=request.client.host if request.client else None,
+            ))
             db.commit()
-            log.error("Run failed  run_id=%d  status=%d  error=%s  total=%d ms",
-                      run_log.id, exc.status_code, exc.detail, duration_ms)
+            log.error("Run failed  run_id=%d  step=%s  status=%d  error=%s  total=%d ms",
+                      run_log.id, run_log.failed_step or "unknown", exc.status_code, exc.detail, duration_ms)
             raise
 
 except Exception as _init_err:
@@ -348,6 +419,7 @@ class SettingsPayload(BaseModel):
     sftp_username: str = ""
     sftp_password: str = ""
     sftp_remote_path: str = ""
+    ps_webserver_path: str = ""
     cors_origins: str = "http://localhost:3000"
 
 
@@ -368,6 +440,7 @@ def get_settings_view():
         "sftp_username":      s.sftp_username,
         "sftp_password":      "***" if s.sftp_password else "",
         "sftp_remote_path":   s.sftp_remote_path,
+        "ps_webserver_path":  s.ps_webserver_path,
         "cors_origins":       s.cors_origins,
     }
 
@@ -487,8 +560,19 @@ def test_peoplesoft(body: PeoplesoftTestPayload):
     except httpx.UnsupportedProtocol as exc:
         raise HTTPException(400, detail=f"Invalid URL — {exc}")
     except httpx.ConnectError as exc:
+        raw = str(exc)
+        if "10061" in raw or "Connection refused" in raw:
+            detail = (
+                f"Connection refused by {url} — the port is not accepting connections. "
+                "Check: (1) the port in your Base URL, (2) that the PeopleSoft service is running, "
+                "(3) HTTP vs HTTPS."
+            )
+        elif "11001" in raw or "getaddrinfo" in raw or "Name or service" in raw:
+            detail = f"Host not found for {url} — verify the Base URL hostname."
+        else:
+            detail = f"Cannot reach PeopleSoft endpoint ({url}) — {exc}"
         log.warning("test_peoplesoft connect error: %s", exc)
-        raise HTTPException(400, detail=f"Cannot reach PeopleSoft endpoint — {exc}")
+        raise HTTPException(400, detail=detail)
     except httpx.TimeoutException:
         raise HTTPException(400, detail="Request timed out after 30 s")
     except Exception as exc:
@@ -559,6 +643,238 @@ def test_retrieval(body: RetrievalTestPayload):
                 raise HTTPException(400, f"Cannot access file: {exc}")
     finally:
         client.close()
+
+
+# ── Windows Server (WinRM) endpoints ──────────────────────────────────────────
+
+class WinPayload(BaseModel):
+    win_host: str
+    win_username: str
+    win_password: str
+    win_port: int = 5985
+    win_use_ssl: bool = False
+    win_auth_type: str = "ntlm"
+    win_connection_type: str = "winrm"   # winrm | smb | ssh
+    win_share: str = "C$"
+    win_domain: str = ""
+
+
+class WinBrowsePayload(WinPayload):
+    path: str
+
+
+class WinReadFilePayload(WinPayload):
+    path: str
+
+
+@app.post("/api/test-windows")
+def test_windows(body: WinPayload):
+    log.info("test_windows  %s:%d  user=%s  type=%s",
+             body.win_host, body.win_port, body.win_username, body.win_connection_type)
+    try:
+        if body.win_connection_type == "smb":
+            import smb_client
+            info = smb_client.test_connection(
+                body.win_host, body.win_username, body.win_password,
+                share=body.win_share, domain=body.win_domain, port=body.win_port,
+            )
+        elif body.win_connection_type == "ssh":
+            import win_ssh_client
+            info = win_ssh_client.test_connection(
+                body.win_host, body.win_username, body.win_password, port=body.win_port,
+            )
+        else:  # winrm (default)
+            import windows_client
+            info = windows_client.test_connection(
+                body.win_host, body.win_username, body.win_password,
+                body.win_port, body.win_use_ssl, body.win_auth_type,
+            )
+        return {"status": "ok", **info}
+    except Exception as exc:
+        log.warning("test_windows failed  %s  type=%s: %s",
+                    body.win_host, body.win_connection_type, exc)
+        raise HTTPException(400, detail=_win_error_msg(
+            str(exc), body.win_connection_type, body.win_host, body.win_port))
+
+
+@app.post("/api/win-browse")
+def win_browse(body: WinBrowsePayload):
+    log.info("win_browse  %s  path=%s  type=%s",
+             body.win_host, body.path, body.win_connection_type)
+    try:
+        if body.win_connection_type == "smb":
+            import smb_client
+            items = smb_client.list_directory(
+                body.win_host, body.win_username, body.win_password,
+                body.path, share=body.win_share, domain=body.win_domain, port=body.win_port,
+            )
+        elif body.win_connection_type == "ssh":
+            import win_ssh_client
+            items = win_ssh_client.list_directory(
+                body.win_host, body.win_username, body.win_password,
+                body.path, port=body.win_port,
+            )
+        else:  # winrm
+            import windows_client
+            items = windows_client.list_directory(
+                body.win_host, body.win_username, body.win_password,
+                body.path, body.win_port, body.win_use_ssl, body.win_auth_type,
+            )
+        return {"path": body.path, "items": items}
+    except Exception as exc:
+        log.warning("win_browse failed  %s  path=%s  type=%s: %s",
+                    body.win_host, body.path, body.win_connection_type, exc)
+        raise HTTPException(400, detail=_win_error_msg(
+            str(exc), body.win_connection_type, body.win_host, body.win_port))
+
+
+@app.post("/api/win-read-file")
+def win_read_file(body: WinReadFilePayload):
+    log.info("win_read_file  %s  path=%s  type=%s",
+             body.win_host, body.path, body.win_connection_type)
+    try:
+        if body.win_connection_type == "smb":
+            import smb_client
+            content = smb_client.read_file(
+                body.win_host, body.win_username, body.win_password,
+                body.path, domain=body.win_domain, port=body.win_port,
+            )
+        elif body.win_connection_type == "ssh":
+            import win_ssh_client
+            content = win_ssh_client.read_file(
+                body.win_host, body.win_username, body.win_password,
+                body.path, port=body.win_port,
+            )
+        else:  # winrm
+            import windows_client
+            content = windows_client.read_file(
+                body.win_host, body.win_username, body.win_password,
+                body.path, body.win_port, body.win_use_ssl, body.win_auth_type,
+            )
+        return {"path": body.path, "content": content}
+    except Exception as exc:
+        log.warning("win_read_file failed  %s  path=%s  type=%s: %s",
+                    body.win_host, body.path, body.win_connection_type, exc)
+        raise HTTPException(400, detail=_win_error_msg(
+            str(exc), body.win_connection_type, body.win_host, body.win_port))
+
+
+def _winrm_error_msg(raw: str, host: str, port: int) -> str:
+    """Convert low-level WinRM exceptions into actionable user messages."""
+    r = raw.lower()
+
+    if "connection refused" in r or "10061" in r:
+        return (
+            f"Connection refused by {host}:{port}. "
+            "WinRM is not listening on that port. "
+            "Run this in an elevated PowerShell on the remote server to enable it:\n"
+            "  winrm quickconfig\n"
+            f"Default HTTP port is 5985; HTTPS is 5986."
+        )
+    if "timed out" in r or "timeout" in r:
+        return (
+            f"Connection to {host}:{port} timed out. "
+            f"Check that port {port} is open in Windows Firewall on the remote host."
+        )
+    if "rejected" in r or "credential" in r or "401" in r or "unauthorized" in r:
+        return (
+            "Credentials rejected. RDP credentials do not automatically grant WinRM access.\n\n"
+            "RDP into the server and run these commands in an elevated PowerShell (Run as Administrator):\n\n"
+            "STEP 1 — Enable WinRM (if not already done):\n"
+            "  winrm quickconfig -q\n\n"
+            "STEP 2 — Fix UAC token filtering for local accounts (most common cause):\n"
+            "  reg add HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+            " /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f\n\n"
+            "STEP 3 — Enable Basic auth as an alternative (simpler, try this if NTLM still fails):\n"
+            "  winrm set winrm/config/service/auth @{Basic=\"true\"}\n"
+            "  winrm set winrm/config/service @{AllowUnencrypted=\"true\"}\n"
+            "  Then switch Auth Type to 'Basic' in the tool.\n\n"
+            "STEP 4 — Restart WinRM service:\n"
+            "  Restart-Service WinRM"
+        )
+    if "getaddrinfo" in r or "name or service" in r or "11001" in r:
+        return f"Host not found: '{host}'. Verify the IP address or hostname is correct."
+    if "access is denied" in r or "accessdenied" in r:
+        return (
+            "Access denied — the account does not have WinRM permission. "
+            "Add it to 'Remote Management Users' group on the remote server or use an Administrator account."
+        )
+    if "kerberos" in r or "kinit" in r:
+        return (
+            "Kerberos authentication failed. "
+            "Use 'NTLM' or 'Negotiate' auth type instead, or ensure this machine is domain-joined."
+        )
+    return raw
+
+
+def _smb_error_msg(raw: str, host: str, port: int) -> str:
+    """Translate SMB / smbprotocol exceptions into actionable messages."""
+    r = raw.lower()
+    if "connection refused" in r or "10061" in r or "errno 111" in r:
+        return (
+            f"SMB connection refused by {host}:{port}. "
+            "Check that port 445 is open and Windows File Sharing is enabled on the remote server."
+        )
+    if "nt_status_logon_failure" in r or "logon_failure" in r or "rejected" in r or "wrong password" in r:
+        return (
+            "SMB credentials rejected. Verify the username and password. "
+            "For local accounts use just the username (no domain prefix). "
+            "Ensure the account is in the Administrators group to access admin shares (C$, D$)."
+        )
+    if "nt_status_access_denied" in r or "access_denied" in r:
+        return (
+            "SMB access denied. The account must be in the Administrators group "
+            "to browse admin shares (C$, D$, ADMIN$)."
+        )
+    if "nt_status_bad_network_name" in r or "bad_network_name" in r:
+        return (
+            f"SMB share not found on {host}. "
+            "Try 'C$' to access the C drive (requires Administrator rights), "
+            "or ask the server admin which share name to use."
+        )
+    if "timed out" in r or "timeout" in r:
+        return (
+            f"Connection to {host}:{port} timed out. "
+            "Ensure port 445 is open in Windows Firewall on the remote host."
+        )
+    if "getaddrinfo" in r or "name or service" in r or "11001" in r:
+        return f"Host not found: '{host}'. Verify the IP address or hostname."
+    return raw
+
+
+def _ssh_error_msg(raw: str, host: str, port: int) -> str:
+    """Translate SSH / paramiko exceptions into actionable messages."""
+    r = raw.lower()
+    if "connection refused" in r or "10061" in r:
+        return (
+            f"SSH connection refused by {host}:{port}. OpenSSH may not be installed or running.\n"
+            "Install it on the remote server (elevated PowerShell):\n"
+            "  Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0\n"
+            "  Start-Service sshd\n"
+            "  Set-Service -Name sshd -StartupType Automatic"
+        )
+    if "authentication" in r or "auth failed" in r:
+        return (
+            "SSH authentication failed. Verify the username and password. "
+            "Ensure the Windows account is allowed SSH access."
+        )
+    if "timed out" in r or "timeout" in r:
+        return (
+            f"Connection to {host}:{port} timed out. "
+            f"Check that port {port} is open in Windows Firewall."
+        )
+    if "getaddrinfo" in r or "name or service" in r or "11001" in r:
+        return f"Host not found: '{host}'. Verify the IP address or hostname."
+    return raw
+
+
+def _win_error_msg(raw: str, connection_type: str, host: str, port: int) -> str:
+    """Dispatch to the appropriate error formatter based on connection type."""
+    if connection_type == "smb":
+        return _smb_error_msg(raw, host, port)
+    if connection_type == "ssh":
+        return _ssh_error_msg(raw, host, port)
+    return _winrm_error_msg(raw, host, port)
 
 
 @app.post("/api/settings")

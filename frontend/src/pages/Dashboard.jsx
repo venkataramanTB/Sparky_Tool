@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Box, Typography, Button, Alert, CircularProgress,
   Select, MenuItem, Chip, Grid, Card, CardContent,
-  Tooltip, IconButton,
+  Tooltip, IconButton, Tabs, Tab,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { DataGrid } from '@mui/x-data-grid'
@@ -23,7 +23,9 @@ import SettingsIcon           from '@mui/icons-material/Settings'
 import KPICards    from '../components/KPICards'
 import Charts      from '../components/Charts'
 import DataTable   from '../components/DataTable'
-import LoadingDialog from '../components/LoadingDialog'
+import LoadingDialog         from '../components/LoadingDialog'
+import FunctionalDashboard  from './FunctionalDashboard'
+import OperationalDashboard from './OperationalDashboard'
 import { useAuth } from '../AuthContext'
 import { listConfigs, listRuns, runConfig } from '../api'
 
@@ -147,10 +149,18 @@ export default function Dashboard() {
   const [runsView,       setRunsView]       = useState(
     () => localStorage.getItem('dashboard_runs_view') || 'table'
   )
+  const [dashTab,        setDashTab]        = useState(
+    () => parseInt(localStorage.getItem('dashboard_tab') || '0', 10)
+  )
 
   const handleRunsViewChange = (v) => {
     setRunsView(v)
     localStorage.setItem('dashboard_runs_view', v)
+  }
+
+  const handleDashTabChange = (_, v) => {
+    setDashTab(v)
+    localStorage.setItem('dashboard_tab', String(v))
   }
 
   const selectedConfig = useMemo(
@@ -243,7 +253,7 @@ export default function Dashboard() {
               Sparky Platform
             </Typography>
             <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.4rem', fontWeight: 700, color: 'text.primary', letterSpacing: '0.02em', lineHeight: 1 }}>
-              Operational Dashboard
+              Dashboard
             </Typography>
           </Box>
 
@@ -312,6 +322,35 @@ export default function Dashboard() {
             </Button>
           </Box>
         </Box>
+
+        {/* ── Sub-tabs: Run | Functional | Operational ────────────────────── */}
+        <Tabs
+          value={dashTab}
+          onChange={handleDashTabChange}
+          sx={{
+            mb: 4,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            '& .MuiTab-root': {
+              fontFamily: '"Raleway", sans-serif',
+              fontSize: '0.63rem',
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'text.secondary',
+              minHeight: 40,
+            },
+            '& .Mui-selected':      { color: accent },
+            '& .MuiTabs-indicator': { bgcolor: accent },
+          }}
+        >
+          <Tab label="Run"         />
+          <Tab label="Functional"  />
+          <Tab label="Operational" />
+        </Tabs>
+
+        {/* ── Tab panels ────────────────────────────────────────────────────── */}
+        {dashTab === 0 && (
+          <>
 
         {error && (
           <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>{error}</Alert>
@@ -574,6 +613,12 @@ export default function Dashboard() {
             )}
           </Box>
         )}
+
+          </>
+        )}
+
+        {dashTab === 1 && <FunctionalDashboard />}
+        {dashTab === 2 && <OperationalDashboard />}
 
       </Box>
 
