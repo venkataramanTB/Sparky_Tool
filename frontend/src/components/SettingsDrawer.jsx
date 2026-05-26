@@ -20,7 +20,7 @@ const EMPTY_FORM = {
   ps_base_url: '', ps_auth_type: 'basic', ps_username: '', ps_password: '',
   ps_endpoint: '', ps_process_name: 'SM_DISCOVERY',
   sftp_host: '', sftp_port: '22', sftp_username: '',
-  sftp_password: '', sftp_remote_path: '', cors_origins: 'http://localhost:3000',
+  sftp_password: '', sftp_remote_path: '', cors_origins: '*',
 }
 
 export default function SettingsDrawer({ open, onClose }) {
@@ -53,7 +53,7 @@ export default function SettingsDrawer({ open, onClose }) {
           sftp_username: d.sftp_username ?? '',
           sftp_password: d.sftp_password === '***' ? '' : (d.sftp_password ?? ''),
           sftp_remote_path: d.sftp_remote_path ?? '',
-          cors_origins: d.cors_origins ?? 'http://localhost:3000',
+          cors_origins: d.cors_origins ?? '*',
         })
       })
       .catch(() => setError('Failed to load settings'))
