@@ -1,238 +1,195 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { DataGrid, GridToolbarQuickFilter } from '@mui/x-data-grid'
 import {
-  useReactTable, getCoreRowModel, getFilteredRowModel,
-  getSortedRowModel, getPaginationRowModel, flexRender,
-} from '@tanstack/react-table'
-import {
-  Box, Typography, TextField, InputAdornment, IconButton, Select, MenuItem,
+  Box, Typography, Grid, Card, CardContent,
+  InputAdornment, TextField,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
-import FirstPageIcon from '@mui/icons-material/FirstPage'
-import LastPageIcon from '@mui/icons-material/LastPage'
+import { useThemeContext } from '../ThemeContext'
+import ViewToggle from './ViewToggle'
+import { getDataGridSx } from '../utils/dataGridSx'
 
-export default function DataTable({ rows, columns }) {
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [sorting, setSorting] = useState([])
-
-  const columnDefs = useMemo(() => columns.map(col => ({ accessorKey: col, header: col })), [columns])
-
-  const table = useReactTable({
-    data: rows, columns: columnDefs,
-    state: { globalFilter, sorting },
-    onGlobalFilterChange: setGlobalFilter,
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 20 } },
-  })
-
-  const filteredCount = table.getFilteredRowModel().rows.length
-  const { pageIndex, pageSize } = table.getState().pagination
-  const pageCount = table.getPageCount()
-  const from = pageIndex * pageSize + 1
-  const to = Math.min(from + pageSize - 1, filteredCount)
-
+// ── Toolbar injected into the DataGrid ────────────────────────────────────────
+function Toolbar({ rowCount, filteredCount }) {
   return (
     <Box sx={{
-      background: '#111316',
-      border: '1px solid rgba(201,168,76,0.1)',
-      overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      px: 2, py: 1.5,
+      borderBottom: '1px solid',
+      borderColor: 'divider',
     }}>
-      {/* Toolbar */}
-      <Box sx={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        px: 2.5, py: 2,
-        borderBottom: '1px solid rgba(201,168,76,0.08)',
-      }}>
+      <GridToolbarQuickFilter
+        debounceMs={200}
+        sx={{
+          '& .MuiInputBase-root': {
+            fontFamily: '"Raleway", sans-serif',
+            fontSize: '0.82rem',
+            color: 'text.primary',
+          },
+          '& .MuiInputBase-input::placeholder': { color: 'text.disabled' },
+        }}
+        placeholder="Search records…"
+      />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        {filteredCount !== rowCount && (
+          <Typography sx={{ fontSize: '0.68rem', color: 'primary.main', fontFamily: '"JetBrains Mono", monospace' }}>
+            {filteredCount} match{filteredCount !== 1 ? 'es' : ''}
+          </Typography>
+        )}
+        <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', fontWeight: 700, letterSpacing: '0.18em' }}>
+          {rowCount.toLocaleString()} RECORDS
+        </Typography>
+      </Box>
+    </Box>
+  )
+}
+
+// ── Card view ─────────────────────────────────────────────────────────────────
+function CsvCardGrid({ rows, columns }) {
+  const { accent } = useThemeContext()
+  const [search, setSearch] = useState('')
+
+  const filtered = useMemo(() => {
+    if (!search) return rows
+    const q = search.toLowerCase()
+    return rows.filter((r) =>
+      columns.some((c) => String(r[c] ?? '').toLowerCase().includes(q))
+    )
+  }, [rows, columns, search])
+
+  return (
+    <Box>
+      <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <TextField
           size="small"
           placeholder="Search records…"
-          value={globalFilter}
-          onChange={e => setGlobalFilter(e.target.value)}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
           InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon sx={{ fontSize: 15, color: '#3a3428' }} />
-              </InputAdornment>
-            ),
-            sx: {
-              fontFamily: '"Raleway", sans-serif',
-              fontSize: '0.82rem',
-              color: '#ede8d0',
-              '& input::placeholder': { color: '#3a3428', opacity: 1 },
-            },
+            startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 15, color: 'text.disabled' }} /></InputAdornment>,
+            sx: { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' },
           }}
           sx={{
-            width: 280,
+            width: 260,
             '& .MuiOutlinedInput-root': {
-              borderRadius: '1px',
-              bgcolor: 'rgba(201,168,76,0.02)',
-              '& fieldset': { borderColor: 'rgba(201,168,76,0.15)' },
-              '&:hover fieldset': { borderColor: 'rgba(201,168,76,0.3)' },
-              '&.Mui-focused fieldset': { borderColor: 'rgba(201,168,76,0.5)' },
+              borderRadius: '2px',
+              '& fieldset': { borderColor: 'divider' },
+              '&:hover fieldset': { borderColor: `${accent}55` },
+              '&.Mui-focused fieldset': { borderColor: accent },
             },
           }}
         />
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {globalFilter && (
-            <Typography sx={{ fontSize: '0.68rem', color: '#c9a84c', letterSpacing: '0.1em', fontFamily: '"JetBrains Mono", monospace' }}>
-              {filteredCount} match{filteredCount !== 1 ? 'es' : ''}
-            </Typography>
-          )}
-          <Typography sx={{ fontSize: '0.6rem', color: '#3a3428', letterSpacing: '0.2em', fontFamily: '"Raleway", sans-serif', fontWeight: 700 }}>
-            {rows.length.toLocaleString()} RECORDS
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Table */}
-      <Box sx={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            {table.getHeaderGroups().map(hg => (
-              <tr key={hg.id}>
-                {hg.headers.map(h => {
-                  const sorted = h.column.getIsSorted()
-                  return (
-                    <th
-                      key={h.id}
-                      onClick={h.column.getToggleSortingHandler()}
-                      style={{
-                        padding: '10px 14px',
-                        textAlign: 'left',
-                        background: 'rgba(201,168,76,0.03)',
-                        borderBottom: '1px solid rgba(201,168,76,0.12)',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        whiteSpace: 'nowrap',
-                        position: 'sticky',
-                        top: 0,
-                        zIndex: 1,
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Typography sx={{
-                          fontSize: '0.6rem',
-                          fontWeight: 700,
-                          letterSpacing: '0.2em',
-                          color: sorted ? '#c9a84c' : '#5a5040',
-                          fontFamily: '"Raleway", sans-serif',
-                          textTransform: 'uppercase',
-                          transition: 'color 0.15s ease',
-                        }}>
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-                        </Typography>
-                        {sorted === 'asc'  ? <ArrowUpwardIcon   sx={{ fontSize: 10, color: '#c9a84c' }} />
-                         : sorted === 'desc' ? <ArrowDownwardIcon sx={{ fontSize: 10, color: '#c9a84c' }} />
-                         : <UnfoldMoreIcon sx={{ fontSize: 10, color: '#3a3428', opacity: 0.5 }} />}
-                      </Box>
-                    </th>
-                  )
-                })}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row, ri) => (
-              <tr
-                key={row.id}
-                style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(201,168,76,0.015)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(201,168,76,0.04)'}
-                onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? 'transparent' : 'rgba(201,168,76,0.015)'}
-              >
-                {row.getVisibleCells().map(cell => (
-                  <td
-                    key={cell.id}
-                    style={{
-                      padding: '8px 14px',
-                      borderBottom: '1px solid rgba(201,168,76,0.05)',
-                      fontFamily: '"JetBrains Mono", monospace',
-                      fontSize: '0.78rem',
-                      color: '#7a7060',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {String(cell.getValue() ?? '')}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Box>
-
-      {/* Pagination */}
-      <Box sx={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        px: 2.5, py: 1.5,
-        borderTop: '1px solid rgba(201,168,76,0.08)',
-      }}>
-        <Typography sx={{ fontSize: '0.65rem', color: '#3a3428', fontFamily: '"JetBrains Mono", monospace' }}>
-          {filteredCount > 0 ? `${from}–${to} of ${filteredCount.toLocaleString()}` : '0 results'}
+        <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', fontWeight: 700, letterSpacing: '0.18em' }}>
+          {filtered.length.toLocaleString()} / {rows.length.toLocaleString()} RECORDS
         </Typography>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography sx={{ fontSize: '0.58rem', color: '#3a3428', fontFamily: '"Raleway", sans-serif', letterSpacing: '0.16em', fontWeight: 700 }}>
-            ROWS
-          </Typography>
-          <Select
-            value={pageSize}
-            onChange={e => { table.setPageSize(+e.target.value); table.setPageIndex(0) }}
-            size="small"
-            sx={{
-              fontSize: '0.72rem', fontFamily: '"JetBrains Mono", monospace',
-              color: '#7a7060', height: 26, borderRadius: '1px',
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(201,168,76,0.15)' },
-              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(201,168,76,0.3)' },
-              '& .MuiSelect-icon': { color: '#3a3428' },
-            }}
-          >
-            {[10, 20, 50, 100].map(n => (
-              <MenuItem key={n} value={n} sx={{ fontSize: '0.72rem', fontFamily: '"JetBrains Mono", monospace' }}>{n}</MenuItem>
-            ))}
-          </Select>
-
-          <Box sx={{ display: 'flex', gap: 0.25, ml: 0.5 }}>
-            {[
-              { icon: <FirstPageIcon sx={{ fontSize: 15 }} />, action: () => table.setPageIndex(0), disabled: !table.getCanPreviousPage() },
-              { icon: <ChevronLeftIcon sx={{ fontSize: 15 }} />, action: () => table.previousPage(), disabled: !table.getCanPreviousPage() },
-              { icon: <ChevronRightIcon sx={{ fontSize: 15 }} />, action: () => table.nextPage(), disabled: !table.getCanNextPage() },
-              { icon: <LastPageIcon sx={{ fontSize: 15 }} />, action: () => table.setPageIndex(pageCount - 1), disabled: !table.getCanNextPage() },
-            ].map(({ icon, action, disabled }, i) => (
-              <IconButton
-                key={i}
-                onClick={action}
-                disabled={disabled}
-                size="small"
-                sx={{
-                  width: 26, height: 26, borderRadius: '1px',
-                  color: disabled ? '#3a3428' : '#5a5040',
-                  border: '1px solid rgba(201,168,76,0.1)',
-                  '&:hover:not(:disabled)': {
-                    color: '#c9a84c',
-                    bgcolor: 'rgba(201,168,76,0.06)',
-                    borderColor: 'rgba(201,168,76,0.3)',
-                  },
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {icon}
-              </IconButton>
-            ))}
-          </Box>
-
-          <Typography sx={{ fontSize: '0.65rem', color: '#3a3428', fontFamily: '"JetBrains Mono", monospace', ml: 0.5 }}>
-            {pageIndex + 1} / {pageCount}
-          </Typography>
-        </Box>
       </Box>
+      <Box sx={{ p: 2 }}>
+        <Grid container spacing={2}>
+          {filtered.map((row, i) => (
+            <Grid item xs={12} sm={6} md={4} key={i}>
+              <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%' }}>
+                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                  {columns.map((col) => (
+                    <Box key={col} sx={{ display: 'flex', gap: 1, mb: 0.6, alignItems: 'flex-start' }}>
+                      <Typography sx={{
+                        fontSize: '0.56rem', fontWeight: 700, letterSpacing: '0.14em',
+                        textTransform: 'uppercase', color: 'text.disabled',
+                        fontFamily: '"Raleway", sans-serif', minWidth: 90, flexShrink: 0, pt: 0.1,
+                      }}>
+                        {col}
+                      </Typography>
+                      <Typography sx={{
+                        fontFamily: '"JetBrains Mono", monospace', fontSize: '0.74rem',
+                        color: 'text.primary', wordBreak: 'break-all',
+                      }}>
+                        {String(row[col] ?? '—')}
+                      </Typography>
+                    </Box>
+                  ))}
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+          {!filtered.length && (
+            <Grid item xs={12}>
+              <Typography sx={{ color: 'text.disabled', textAlign: 'center', py: 6, fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' }}>
+                No records match your search
+              </Typography>
+            </Grid>
+          )}
+        </Grid>
+      </Box>
+    </Box>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function DataTable({ rows, columns }) {
+  const { accent, mode } = useThemeContext()
+  const [viewMode, setViewMode] = useState(
+    () => localStorage.getItem('datatable_view') || 'table'
+  )
+
+  const handleViewChange = (v) => {
+    setViewMode(v)
+    localStorage.setItem('datatable_view', v)
+  }
+
+  // Add stable row id for DataGrid
+  const rowsWithId = useMemo(
+    () => rows.map((r, i) => ({ ...r, _idx: i })),
+    [rows],
+  )
+
+  const colDefs = useMemo(
+    () => columns.map((col) => ({
+      field:      col,
+      headerName: col,
+      flex:       1,
+      minWidth:   120,
+      renderCell: (p) => (
+        <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.76rem', color: 'text.secondary' }}>
+          {String(p.value ?? '')}
+        </Typography>
+      ),
+    })),
+    [columns],
+  )
+
+  const [filterModel, setFilterModel] = useState({ items: [], quickFilterValues: [] })
+  const filteredCount = useMemo(() => {
+    const q = (filterModel.quickFilterValues ?? []).join(' ').toLowerCase()
+    if (!q) return rows.length
+    return rows.filter((r) => columns.some((c) => String(r[c] ?? '').toLowerCase().includes(q))).length
+  }, [filterModel, rows, columns])
+
+  return (
+    <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '2px', overflow: 'hidden', bgcolor: 'background.paper' }}>
+      {/* Header with toggle */}
+      <Box sx={{ px: 2.5, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.disabled' }}>
+          Row Data
+        </Typography>
+        <ViewToggle value={viewMode} onChange={handleViewChange} />
+      </Box>
+
+      {viewMode === 'table' ? (
+        <DataGrid
+          rows={rowsWithId}
+          columns={colDefs}
+          getRowId={(r) => r._idx}
+          autoHeight
+          disableRowSelectionOnClick
+          filterModel={filterModel}
+          onFilterModelChange={setFilterModel}
+          pageSizeOptions={[10, 25, 50, 100]}
+          initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+          slots={{ toolbar: () => <Toolbar rowCount={rows.length} filteredCount={filteredCount} /> }}
+          sx={getDataGridSx(accent, mode)}
+        />
+      ) : (
+        <CsvCardGrid rows={rows} columns={columns} />
+      )}
     </Box>
   )
 }

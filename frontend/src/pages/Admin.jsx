@@ -1,108 +1,357 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Box, Typography, CircularProgress, Grid, Card, CardContent,
-  Table, TableBody, TableCell, TableHead, TableRow, Tabs, Tab,
-  Chip, Alert, Tooltip, IconButton,
+  Tabs, Tab, Chip, Alert, Tooltip, IconButton, TextField, InputAdornment,
+  Dialog, DialogTitle, DialogContent, DialogActions, Button,
+  Select, MenuItem, FormControl, InputLabel, Switch, FormControlLabel,
+  Divider,
 } from '@mui/material'
-import RefreshIcon from '@mui/icons-material/Refresh'
+import { DataGrid } from '@mui/x-data-grid'
+import ViewToggle from '../components/ViewToggle'
+import { getDataGridSx } from '../utils/dataGridSx'
+import { useTheme } from '@mui/material/styles'
+import RefreshIcon               from '@mui/icons-material/Refresh'
+import ContentCopyIcon           from '@mui/icons-material/ContentCopy'
+import DeleteIcon                from '@mui/icons-material/Delete'
+import EditIcon                  from '@mui/icons-material/Edit'
+import SearchIcon                from '@mui/icons-material/Search'
+import AdminPanelSettingsIcon    from '@mui/icons-material/AdminPanelSettings'
+import PersonIcon                from '@mui/icons-material/Person'
+import PersonAddIcon             from '@mui/icons-material/PersonAdd'
+import ShieldIcon                from '@mui/icons-material/Shield'
+import CheckCircleOutlineIcon    from '@mui/icons-material/CheckCircleOutline'
+import ErrorOutlineIcon          from '@mui/icons-material/ErrorOutline'
+import HourglassEmptyIcon        from '@mui/icons-material/HourglassEmpty'
+import BarChartIcon              from '@mui/icons-material/BarChart'
+import TrendingUpIcon            from '@mui/icons-material/TrendingUp'
+import GroupIcon                 from '@mui/icons-material/Group'
+import SpeedIcon                 from '@mui/icons-material/Speed'
+import StorageIcon               from '@mui/icons-material/Storage'
+import CloudSyncIcon             from '@mui/icons-material/CloudSync'
+import CheckIcon                 from '@mui/icons-material/Check'
+import SaveIcon                  from '@mui/icons-material/Save'
+import CancelIcon                from '@mui/icons-material/Cancel'
+import SendIcon                  from '@mui/icons-material/Send'
+import WarningAmberIcon          from '@mui/icons-material/WarningAmber'
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip as ChartTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
+} from 'recharts'
 import { useAuth } from '../AuthContext'
-import { listAdminStats, listAdminLogs, listAdminUsers, listAdminRuns, setUserRole } from '../api'
+import {
+  listAdminStats, listAdminLogs, listAdminUsers, listAdminRuns,
+  inviteAdminUser, setUserRole, updateAdminUser, deleteAdminUser,
+} from '../api'
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── tiny helpers ──────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub }) {
+function fmtMs(ms) {
+  if (ms == null) return '—'
+  if (ms < 1000) return `${ms} ms`
+  return `${(ms / 1000).toFixed(1)} s`
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—'
+  return new Date(ts).toLocaleString(undefined, {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+function fmtDay(str) {
+  if (!str) return ''
+  return new Date(str).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+// ── MonoValue ─────────────────────────────────────────────────────────────────
+
+function MonoValue({ val }) {
+  const [copied, setCopied] = useState(false)
+  if (!val) {
+    return (
+      <Typography component="span" sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', color: 'text.disabled' }}>
+        —
+      </Typography>
+    )
+  }
+  const copy = () => {
+    navigator.clipboard.writeText(val)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
   return (
-    <Card variant="outlined" sx={{ bgcolor: '#14161a', borderColor: 'rgba(201,168,76,0.12)', height: '100%' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Typography component="span" sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', color: 'primary.main' }}>
+        {val}
+      </Typography>
+      <Tooltip title={copied ? 'Copied!' : 'Copy'} placement="top">
+        <IconButton size="small" onClick={copy} sx={{ p: 0.25, opacity: 0.45, '&:hover': { opacity: 1 } }}>
+          {copied ? <CheckIcon sx={{ fontSize: 11, color: '#6b8f71' }} /> : <ContentCopyIcon sx={{ fontSize: 11 }} />}
+        </IconButton>
+      </Tooltip>
+    </Box>
+  )
+}
+
+// ── StatusChip ────────────────────────────────────────────────────────────────
+
+function StatusChip({ status, sftp_skipped }) {
+  let label = status
+  let bg    = 'rgba(201,168,76,0.12)'
+  let color = '#c9a84c'
+  let Icon  = HourglassEmptyIcon
+
+  if (status === 'success' && sftp_skipped) {
+    label = 'PS only'; bg = 'rgba(100,149,180,0.14)'; color = '#6495b4'; Icon = CloudSyncIcon
+  } else if (status === 'success') {
+    label = 'success'; bg = 'rgba(107,143,113,0.14)'; color = '#6b8f71'; Icon = CheckCircleOutlineIcon
+  } else if (status === 'error') {
+    label = 'error'; bg = 'rgba(180,80,80,0.16)'; color = '#b45050'; Icon = ErrorOutlineIcon
+  }
+
+  const chip = (
+    <Chip
+      icon={<Icon sx={{ fontSize: '12px !important', color: `${color} !important` }} />}
+      label={label}
+      size="small"
+      sx={{ bgcolor: bg, color, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', letterSpacing: '0.05em', height: 22 }}
+    />
+  )
+  if (status === 'success' && sftp_skipped) {
+    return <Tooltip title="PeopleSoft triggered — SFTP not configured, no CSV downloaded" arrow>{chip}</Tooltip>
+  }
+  return chip
+}
+
+// ── StatCard ─────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, Icon, accent }) {
+  return (
+    <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%' }}>
       <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Typography sx={{ fontSize: '0.6rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#c9a84c', mb: 1 }}>
-          {label}
-        </Typography>
-        <Typography sx={{ fontSize: '1.9rem', fontWeight: 700, color: '#ede8d0', lineHeight: 1 }}>{value}</Typography>
-        {sub && (
-          <Typography sx={{ fontSize: '0.65rem', color: '#5a5040', mt: 0.75 }}>{sub}</Typography>
-        )}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <Box>
+            <Typography sx={{ fontSize: '0.58rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.secondary', mb: 0.75 }}>
+              {label}
+            </Typography>
+            <Typography sx={{ fontSize: '1.8rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>{value}</Typography>
+            {sub && <Typography sx={{ fontSize: '0.62rem', color: 'text.disabled', mt: 0.75 }}>{sub}</Typography>}
+          </Box>
+          {Icon && <Icon sx={{ fontSize: 22, color: accent || 'primary.main', opacity: 0.7, mt: 0.5 }} />}
+        </Box>
       </CardContent>
     </Card>
   )
 }
 
-function StatusChip({ status, sftp_skipped }) {
-  let label = status
-  let bg = 'rgba(201,168,76,0.1)'
-  let color = '#c9a84c'
+// ── RoleSelect: inline role picker with per-row loading ───────────────────────
 
-  if (status === 'success' && sftp_skipped) {
-    label = 'PS only'
-    bg = 'rgba(100,149,180,0.15)'
-    color = '#6495b4'
-  } else if (status === 'success') {
-    label = 'success'
-    bg = 'rgba(107,143,113,0.15)'
-    color = '#6b8f71'
-  } else if (status === 'error') {
-    label = 'error'
-    bg = 'rgba(180,80,80,0.18)'
-    color = '#b45050'
-  } else if (status === 'running') {
-    label = 'running'
-    bg = 'rgba(201,168,76,0.1)'
-    color = '#c9a84c'
-  }
-
-  const chip = (
-    <Chip label={label} size="small"
-      sx={{ bgcolor: bg, color, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', letterSpacing: '0.06em', height: 20 }} />
-  )
-
-  if (status === 'success' && sftp_skipped) {
+function RoleSelect({ userId, currentRole, isSelf, onRoleChange, loadingId }) {
+  const theme = useTheme()
+  const accent = theme.palette.primary.main
+  const isLoading = loadingId === userId
+  if (isSelf) {
     return (
-      <Tooltip title="PeopleSoft triggered successfully — SFTP not configured, no CSV downloaded" arrow>
-        {chip}
-      </Tooltip>
+      <Chip
+        label={currentRole}
+        size="small"
+        icon={currentRole === 'admin' ? <ShieldIcon sx={{ fontSize: '11px !important' }} /> : <PersonIcon sx={{ fontSize: '11px !important' }} />}
+        sx={{
+          bgcolor: currentRole === 'admin' ? `${accent}1a` : 'rgba(128,128,128,0.1)',
+          color: currentRole === 'admin' ? 'primary.main' : 'text.secondary',
+          fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 22,
+          textTransform: 'uppercase', letterSpacing: '0.06em',
+        }}
+      />
     )
   }
-  return chip
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+      <Select
+        value={currentRole}
+        size="small"
+        disabled={isLoading}
+        onChange={(e) => onRoleChange(userId, e.target.value)}
+        sx={{
+          fontFamily: '"Raleway", sans-serif',
+          fontSize: '0.7rem',
+          height: 28,
+          minWidth: 90,
+          color: currentRole === 'admin' ? 'primary.main' : 'text.secondary',
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: currentRole === 'admin' ? `${accent}40` : 'divider',
+          },
+          '& .MuiSelect-icon': { fontSize: 16 },
+        }}
+      >
+        <MenuItem value="user"  sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.75rem' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <PersonIcon sx={{ fontSize: 14, color: 'text.secondary' }} /> user
+          </Box>
+        </MenuItem>
+        <MenuItem value="admin" sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.75rem' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <ShieldIcon sx={{ fontSize: 14, color: 'primary.main' }} /> admin
+          </Box>
+        </MenuItem>
+      </Select>
+      {isLoading && <CircularProgress size={12} sx={{ color: 'primary.main' }} />}
+    </Box>
+  )
 }
 
-function mono(val, fallback = '—') {
-  if (!val) return <span style={{ color: '#3a3428' }}>{fallback}</span>
-  return <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', color: '#c9a84c' }}>{val}</span>
-}
+// ── Invite dialog ─────────────────────────────────────────────────────────────
 
-function fmtMs(ms) {
-  if (ms == null) return '—'
-  if (ms < 1000) return `${ms}ms`
-  return `${(ms / 1000).toFixed(1)}s`
-}
+function InviteDialog({ open, onClose, onInvited, token }) {
+  const [form, setForm]   = useState({ email: '', first_name: '', last_name: '', role: 'user' })
+  const [busy, setBusy]   = useState(false)
+  const [err,  setErr]    = useState('')
 
-function fmtDate(ts) {
-  if (!ts) return '—'
-  return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
+  const reset = () => { setForm({ email: '', first_name: '', last_name: '', role: 'user' }); setErr('') }
+  const close = () => { reset(); onClose() }
 
-const cellSx = { fontFamily: '"Raleway", sans-serif', fontSize: '0.75rem', color: '#ede8d0', borderColor: 'rgba(201,168,76,0.06)', py: 1.25 }
-const headSx = { fontFamily: '"Raleway", sans-serif', fontSize: '0.58rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#4a4030', borderColor: 'rgba(201,168,76,0.1)', py: 1.25 }
+  const submit = async () => {
+    const email = form.email.trim().toLowerCase()
+    if (!email || !email.includes('@')) { setErr('A valid email address is required.'); return }
+    setBusy(true); setErr('')
+    try {
+      const res = await inviteAdminUser({ ...form, email }, token)
+      onInvited(res.data)
+      close()
+    } catch (e) {
+      setErr(e.response?.data?.detail || 'Failed to invite user. Check that CLERK_API_SECRET is configured.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={close} maxWidth="xs" fullWidth>
+      <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.4rem', color: 'text.primary', pb: 1 }}>
+        Invite a new user
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem', color: 'text.secondary', mb: 2.5, lineHeight: 1.6 }}>
+          Creates the account in Clerk and pre-assigns the chosen role. The user will receive a Clerk sign-in email.
+        </Typography>
+        <Box sx={{ display: 'grid', gap: 2 }}>
+          <TextField
+            label="Email address *"
+            size="small"
+            fullWidth
+            autoFocus
+            value={form.email}
+            onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+          />
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+            <TextField
+              label="First name"
+              size="small"
+              value={form.first_name}
+              onChange={(e) => setForm((p) => ({ ...p, first_name: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+            <TextField
+              label="Last name"
+              size="small"
+              value={form.last_name}
+              onChange={(e) => setForm((p) => ({ ...p, last_name: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+          </Box>
+          <FormControl size="small" fullWidth>
+            <InputLabel sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem' }}>Role</InputLabel>
+            <Select
+              value={form.role}
+              label="Role"
+              onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
+              sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem' }}
+            >
+              <MenuItem value="user"  sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <PersonIcon sx={{ fontSize: 15, color: 'text.secondary' }} /> User
+                </Box>
+              </MenuItem>
+              <MenuItem value="admin" sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <ShieldIcon sx={{ fontSize: 15, color: 'primary.main' }} /> Admin
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+          {err && (
+            <Alert severity="error" sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.75rem', py: 0.5 }}>{err}</Alert>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+        <Button onClick={close} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+          Cancel
+        </Button>
+        <Button
+          onClick={submit}
+          disabled={busy || !form.email.trim()}
+          variant="contained"
+          startIcon={busy ? <CircularProgress size={14} /> : <SendIcon sx={{ fontSize: 15 }} />}
+          sx={{ bgcolor: 'primary.main', color: 'background.default', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}
+        >
+          {busy ? 'Sending…' : 'Invite'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
 
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function Admin() {
   const { token, user } = useAuth()
-  const [tab, setTab]     = useState(0)
-  const [stats, setStats] = useState(null)
-  const [logs, setLogs]   = useState([])
-  const [users, setUsers] = useState([])
-  const [runs, setRuns]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(null)
+  const theme = useTheme()
+  const accent = theme.palette.primary.main
+  const dark   = theme.palette.mode === 'dark'
 
-  const load = () => {
+  const [tab,     setTab]     = useState(0)
+  const [stats,   setStats]   = useState(null)
+  const [logs,    setLogs]    = useState([])
+  const [users,   setUsers]   = useState([])
+  const [runs,    setRuns]    = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(null)
+
+  // filters
+  const [runStatusFilter, setRunStatusFilter] = useState('all')
+  const [userSearch,      setUserSearch]      = useState('')
+  const [logTypeFilter,   setLogTypeFilter]   = useState('all')
+
+  // view-mode toggles (persisted per table)
+  const [overviewView, setOverviewView] = useState(() => localStorage.getItem('admin_overview_view') || 'table')
+  const [runsView,     setRunsView]     = useState(() => localStorage.getItem('admin_runs_view')     || 'table')
+  const [usersView,    setUsersView]    = useState(() => localStorage.getItem('admin_users_view')    || 'table')
+  const [logsView,     setLogsView]     = useState(() => localStorage.getItem('admin_logs_view')     || 'table')
+
+  const saveView = (key, setter) => (v) => { setter(v); localStorage.setItem(key, v) }
+
+  // per-row role loading
+  const [roleLoadingId, setRoleLoadingId] = useState(null)
+
+  // dialogs
+  const [inviteOpen,    setInviteOpen]    = useState(false)
+  const [deleteDialog,  setDeleteDialog]  = useState(null) // { id, email }
+  const [deleteClerk,   setDeleteClerk]   = useState(false)
+  const [editDialog,    setEditDialog]    = useState(null) // user object
+  const [editForm,      setEditForm]      = useState({ first_name: '', last_name: '' })
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const load = useCallback(() => {
     if (!token) return
     setLoading(true)
     Promise.all([
       listAdminStats(token),
-      listAdminLogs(token, { limit: 100 }),
-      listAdminUsers(token, { limit: 100 }),
-      listAdminRuns(token, { limit: 100 }),
+      listAdminLogs(token,  { limit: 200 }),
+      listAdminUsers(token, { limit: 200 }),
+      listAdminRuns(token,  { limit: 200 }),
     ])
       .then(([statsRes, logsRes, usersRes, runsRes]) => {
         setStats(statsRes.data)
@@ -113,23 +362,94 @@ export default function Admin() {
       })
       .catch((err) => setError(err.response?.data?.detail || 'Unable to load admin data'))
       .finally(() => setLoading(false))
-  }
+  }, [token])
 
-  useEffect(() => { load() }, [token])  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [load])
 
-  const handleRoleToggle = async (userId, currentRole) => {
-    const newRole = currentRole === 'admin' ? 'user' : 'admin'
+  // ── auto-refresh runs while any run is in "running" status ────────────────
+  // Polls every 4 s so instance_id / report_id appear as soon as they land in DB.
+  // Stops automatically once no "running" rows remain.
+  useEffect(() => {
+    if (!token) return
+    if (!runs.some((r) => r.status === 'running')) return
+    const id = setInterval(() => {
+      // Refresh both runs list and stats (which contains recent_runs)
+      Promise.all([
+        listAdminRuns(token,  { limit: 200 }),
+        listAdminStats(token),
+      ])
+        .then(([runsRes, statsRes]) => {
+          setRuns(runsRes.data.items ?? [])
+          setStats(statsRes.data)
+        })
+        .catch(() => {})
+    }, 4000)
+    return () => clearInterval(id)
+  }, [runs, token])
+
+  // ── user actions ──────────────────────────────────────────────────────────
+
+  const handleRoleChange = async (userId, newRole) => {
+    setRoleLoadingId(userId)
     try {
       await setUserRole(userId, newRole, token)
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u))
-    } catch { /* ignore */ }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update role')
+    } finally {
+      setRoleLoadingId(null)
+    }
   }
+
+  const handleDeleteUser = async () => {
+    if (!deleteDialog) return
+    setActionLoading(true)
+    try {
+      await deleteAdminUser(deleteDialog.id, { also_clerk: deleteClerk }, token)
+      setUsers((prev) => prev.filter((u) => u.id !== deleteDialog.id))
+      setDeleteDialog(null)
+      setDeleteClerk(false)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to delete user')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const openEdit = (u) => {
+    setEditDialog(u)
+    setEditForm({ first_name: u.first_name || '', last_name: u.last_name || '' })
+  }
+
+  const handleEditSave = async () => {
+    if (!editDialog) return
+    setActionLoading(true)
+    try {
+      await updateAdminUser(editDialog.id, editForm, token)
+      setUsers((prev) => prev.map((u) => u.id === editDialog.id ? { ...u, ...editForm } : u))
+      setEditDialog(null)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update user')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleInvited = (newUser) => {
+    // Prepend newly created user to the list so they appear immediately
+    setUsers((prev) => {
+      const exists = prev.some((u) => u.id === newUser.id)
+      return exists ? prev.map((u) => u.id === newUser.id ? newUser : u) : [newUser, ...prev]
+    })
+  }
+
+  // ── guards ────────────────────────────────────────────────────────────────
 
   if (!user?.role || user.role !== 'admin') {
     return (
       <Box sx={{ p: 6 }}>
-        <Typography sx={{ color: '#ede8d0', fontSize: '1.4rem', mb: 2 }}>Admin access required</Typography>
-        <Typography sx={{ color: '#7a7060' }}>Only users with an admin role can view system statistics and audit logs.</Typography>
+        <Typography sx={{ color: 'text.primary', fontSize: '1.4rem', mb: 2 }}>Admin access required</Typography>
+        <Typography sx={{ color: 'text.secondary' }}>Only users with an admin role can view this panel.</Typography>
       </Box>
     )
   }
@@ -137,235 +457,808 @@ export default function Admin() {
   if (loading) {
     return (
       <Box sx={{ p: 6, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress size={28} sx={{ color: '#c9a84c' }} />
+        <CircularProgress size={28} sx={{ color: 'primary.main' }} />
       </Box>
     )
   }
 
+  // ── derived ───────────────────────────────────────────────────────────────
+
+  const filteredRuns = runs.filter((r) => {
+    if (runStatusFilter === 'all') return true
+    if (runStatusFilter === 'ps_only') return r.sftp_skipped && r.status === 'success'
+    return r.status === runStatusFilter
+  })
+
+  const filteredUsers = users.filter((u) => {
+    if (!userSearch) return true
+    const q = userSearch.toLowerCase()
+    return (
+      u.email?.toLowerCase().includes(q) ||
+      u.first_name?.toLowerCase().includes(q) ||
+      u.last_name?.toLowerCase().includes(q)
+    )
+  })
+
+  const filteredLogs = logs.filter((e) =>
+    logTypeFilter === 'all' ? true : e.event_type === logTypeFilter,
+  )
+
+  const logEventTypes = [...new Set(logs.map((e) => e.event_type))].sort()
+
+  const failedStepData = stats?.failed_by_step
+    ? Object.entries(stats.failed_by_step).map(([step, count]) => ({ step, count }))
+    : []
+
+  const pieData = stats ? [
+    { name: 'Success', value: (stats.success_runs || 0) - (stats.sftp_skipped || 0), color: '#6b8f71' },
+    { name: 'PS Only', value: stats.sftp_skipped || 0,   color: '#6495b4' },
+    { name: 'Error',   value: stats.error_runs   || 0,   color: '#b45050' },
+    { name: 'Running', value: stats.running_runs  || 0,  color: accent },
+  ].filter((d) => d.value > 0) : []
+
+  const gridStroke = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'
+  const tickFill   = theme.palette.text.secondary
+
+  // tab label helpers
+  const tabLabel = (label, count) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+      {label}
+      {count != null && (
+        <Box component="span" sx={{
+          minWidth: 18, height: 18, px: 0.5, borderRadius: '9px',
+          bgcolor: `${accent}20`, color: 'primary.main',
+          fontFamily: '"JetBrains Mono", monospace', fontSize: '0.55rem',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+        }}>
+          {count}
+        </Box>
+      )}
+    </Box>
+  )
+
+  // ── render ────────────────────────────────────────────────────────────────
+
   return (
-    <Box sx={{ flex: 1, minHeight: '100vh', bgcolor: '#0b0c0e', px: 5, py: 5 }}>
+    <Box sx={{ flex: 1, minHeight: '100%', bgcolor: 'background.default', px: { xs: 2, sm: 4 }, py: 4 }}>
 
       {/* header */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3 }}>
         <Box>
-          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.58rem', letterSpacing: '0.3em', color: '#3a3428', textTransform: 'uppercase', mb: 0.5 }}>System</Typography>
-          <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2rem', fontWeight: 700, color: '#ede8d0' }}>Admin Dashboard</Typography>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.57rem', letterSpacing: '0.3em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
+            System
+          </Typography>
+          <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2rem', fontWeight: 700, color: 'text.primary' }}>
+            Admin Console
+          </Typography>
         </Box>
-        <IconButton onClick={load} size="small" sx={{ color: '#5a5040', mt: 1, '&:hover': { color: '#c9a84c' } }}>
-          <RefreshIcon fontSize="small" />
-        </IconButton>
+        <Tooltip title="Reload all data">
+          <IconButton onClick={load} size="small" sx={{ mt: 1, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Box>
 
-      {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3, bgcolor: 'rgba(180,80,80,0.1)', color: '#e08080', border: '1px solid rgba(180,80,80,0.2)' }}>{error}</Alert>}
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>{error}</Alert>
+      )}
 
-      {/* KPI row */}
+      {/* ── KPI row ───────────────────────────────────────────────────────── */}
       {stats && (
-        <Grid container spacing={2} sx={{ mb: 5 }}>
-          <Grid item xs={6} sm={3} md={2}>
-            <StatCard label="Total users" value={stats.total_users ?? 0} />
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid item xs={6} sm={4} md={2}>
+            <StatCard label="Total users"     value={stats.total_users ?? 0}  Icon={GroupIcon} />
           </Grid>
-          <Grid item xs={6} sm={3} md={2}>
-            <StatCard label="Total runs" value={stats.total_runs ?? 0} sub={`${stats.running_runs ?? 0} in progress`} />
+          <Grid item xs={6} sm={4} md={2}>
+            <StatCard label="Total runs"      value={stats.total_runs ?? 0}   Icon={BarChartIcon} sub={`${stats.running_runs ?? 0} running`} />
           </Grid>
-          <Grid item xs={6} sm={3} md={2}>
-            <StatCard label="Success rate" value={`${stats.success_rate ?? 0}%`} sub={`${stats.success_runs} ok · ${stats.error_runs} failed`} />
+          <Grid item xs={6} sm={4} md={2}>
+            <StatCard label="Success rate"    value={`${stats.success_rate ?? 0}%`} Icon={TrendingUpIcon} accent="#6b8f71" sub={`${stats.success_runs} ok · ${stats.error_runs} err`} />
           </Grid>
-          <Grid item xs={6} sm={3} md={2}>
-            <StatCard label="Avg runtime" value={fmtMs(stats.avg_duration_ms)} />
+          <Grid item xs={6} sm={4} md={2}>
+            <StatCard label="Avg runtime"     value={fmtMs(stats.avg_duration_ms)} Icon={SpeedIcon} />
           </Grid>
-          <Grid item xs={6} sm={3} md={2}>
-            <StatCard label="Rows processed" value={(stats.total_rows_processed ?? 0).toLocaleString()} sub={`avg ${(stats.avg_rows_per_run ?? 0).toLocaleString()} / run`} />
+          <Grid item xs={6} sm={4} md={2}>
+            <StatCard label="Rows processed"  value={(stats.total_rows_processed ?? 0).toLocaleString()} Icon={StorageIcon} sub={`avg ${(stats.avg_rows_per_run ?? 0).toLocaleString()} / run`} />
           </Grid>
-          <Grid item xs={6} sm={3} md={2}>
-            <StatCard label="PS-only runs" value={stats.sftp_skipped ?? 0} sub="SFTP not configured" />
+          <Grid item xs={6} sm={4} md={2}>
+            <StatCard label="PS-only runs"    value={stats.sftp_skipped ?? 0} Icon={CloudSyncIcon} accent="#6495b4" sub="SFTP not configured" />
           </Grid>
         </Grid>
       )}
 
-      {/* tabs */}
+      {/* ── Tabs ─────────────────────────────────────────────────────────── */}
       <Tabs
         value={tab}
         onChange={(_, v) => setTab(v)}
         sx={{
           mb: 3,
-          borderBottom: '1px solid rgba(201,168,76,0.1)',
-          '& .MuiTab-root': { fontFamily: '"Raleway"', fontSize: '0.65rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#4a4030', minHeight: 40 },
-          '& .Mui-selected': { color: '#c9a84c' },
-          '& .MuiTabs-indicator': { bgcolor: '#c9a84c' },
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          '& .MuiTab-root': { fontFamily: '"Raleway"', fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.secondary', minHeight: 40, gap: 0.5 },
+          '& .Mui-selected': { color: 'primary.main' },
+          '& .MuiTabs-indicator': { bgcolor: 'primary.main' },
         }}
       >
-        <Tab label="Reports & Runs" />
-        <Tab label="Users" />
-        <Tab label="Audit log" />
+        <Tab label={tabLabel('Overview')}            icon={<BarChartIcon sx={{ fontSize: 14 }} />}            iconPosition="start" />
+        <Tab label={tabLabel('Runs', runs.length)}   icon={<CloudSyncIcon sx={{ fontSize: 14 }} />}           iconPosition="start" />
+        <Tab label={tabLabel('Users', users.length)} icon={<GroupIcon sx={{ fontSize: 14 }} />}               iconPosition="start" />
+        <Tab label={tabLabel('Audit Log')}           icon={<AdminPanelSettingsIcon sx={{ fontSize: 14 }} />}  iconPosition="start" />
       </Tabs>
 
-      {/* ── tab 0: Reports & Runs ─────────────────────────────────────────── */}
-      {tab === 0 && (
-        <Card variant="outlined" sx={{ bgcolor: '#14161a', borderColor: 'rgba(201,168,76,0.1)' }}>
-          <Box sx={{ overflowX: 'auto' }}>
-            <Table size="small" sx={{ minWidth: 900 }}>
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'rgba(201,168,76,0.03)' }}>
-                  <TableCell sx={headSx}>#</TableCell>
-                  <TableCell sx={headSx}>User</TableCell>
-                  <TableCell sx={headSx}>Config / Process</TableCell>
-                  <TableCell sx={headSx}>Instance ID</TableCell>
-                  <TableCell sx={headSx}>Report ID</TableCell>
-                  <TableCell sx={headSx}>Status</TableCell>
-                  <TableCell sx={headSx}>Rows</TableCell>
-                  <TableCell sx={headSx}>Duration</TableCell>
-                  <TableCell sx={headSx}>Started</TableCell>
-                  <TableCell sx={headSx}>Detail</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {runs.map((r) => (
-                  <TableRow key={r.id} hover sx={{ '&:hover': { bgcolor: 'rgba(201,168,76,0.025)' } }}>
-                    <TableCell sx={{ ...cellSx, color: '#4a4030', fontSize: '0.68rem' }}>{r.id}</TableCell>
-                    <TableCell sx={{ ...cellSx, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      <Tooltip title={r.user_email || r.user_id} arrow>
-                        <span>{r.user_email || r.user_id || '—'}</span>
+      {/* ═══ TAB 0: OVERVIEW ════════════════════════════════════════════════ */}
+      {tab === 0 && stats && (
+        <Box sx={{ display: 'grid', gap: 4 }}>
+
+          {/* Run trend chart */}
+          <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
+              <TrendingUpIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.primary' }}>
+                Run volume — last 30 days
+              </Typography>
+            </Box>
+            {stats.runs_per_day?.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={stats.runs_per_day} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradSuccess" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#6b8f71" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#6b8f71" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="gradErrors" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#b45050" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#b45050" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                  <XAxis dataKey="day" tickFormatter={fmtDay} tick={{ fontSize: 10, fill: tickFill }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: tickFill }} />
+                  <ChartTooltip
+                    contentStyle={{ background: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, borderRadius: 4, fontFamily: '"Raleway", sans-serif', fontSize: 12 }}
+                    labelFormatter={fmtDay}
+                  />
+                  <Legend wrapperStyle={{ fontFamily: '"Raleway", sans-serif', fontSize: 11 }} />
+                  <Area type="monotone" dataKey="success" name="Success" stroke="#6b8f71" fill="url(#gradSuccess)" strokeWidth={1.5} dot={false} />
+                  <Area type="monotone" dataKey="errors"  name="Errors"  stroke="#b45050" fill="url(#gradErrors)"  strokeWidth={1.5} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <Typography sx={{ color: 'text.disabled', fontSize: '0.82rem', py: 4, textAlign: 'center' }}>
+                No run data in the last 30 days
+              </Typography>
+            )}
+          </Card>
+
+          <Grid container spacing={3}>
+            {/* Status breakdown pie */}
+            <Grid item xs={12} md={5}>
+              <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', p: 3, height: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <BarChartIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                  <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.primary' }}>
+                    Status breakdown
+                  </Typography>
+                </Box>
+                {pieData.length > 0 ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <ResponsiveContainer width={140} height={140}>
+                      <PieChart>
+                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={64} dataKey="value" strokeWidth={0}>
+                          {pieData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                        </Pie>
+                        <ChartTooltip
+                          contentStyle={{ background: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, fontFamily: '"Raleway", sans-serif', fontSize: 12 }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {pieData.map((entry) => (
+                        <Box key={entry.name} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: entry.color, flexShrink: 0 }} />
+                          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', color: 'text.secondary' }}>
+                            {entry.name}
+                          </Typography>
+                          <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.primary', ml: 'auto', pl: 1 }}>
+                            {entry.value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                ) : (
+                  <Typography sx={{ color: 'text.disabled', fontSize: '0.82rem', py: 3 }}>No runs yet</Typography>
+                )}
+              </Card>
+            </Grid>
+
+            {/* Failed steps bar chart */}
+            <Grid item xs={12} md={7}>
+              <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', p: 3, height: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <ErrorOutlineIcon sx={{ fontSize: 16, color: '#b45050' }} />
+                  <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.primary' }}>
+                    Failure by step
+                  </Typography>
+                </Box>
+                {failedStepData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={130}>
+                    <BarChart data={failedStepData} layout="vertical" margin={{ left: 0, right: 12, top: 0, bottom: 0 }}>
+                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: tickFill }} />
+                      <YAxis type="category" dataKey="step" tick={{ fontSize: 11, fill: tickFill, fontFamily: '"JetBrains Mono", monospace' }} width={64} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                      <ChartTooltip contentStyle={{ background: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, fontFamily: '"Raleway", sans-serif', fontSize: 12 }} />
+                      <Bar dataKey="count" name="Failures" fill="#b45050" radius={[0, 3, 3, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 3 }}>
+                    <CheckCircleOutlineIcon sx={{ fontSize: 18, color: '#6b8f71' }} />
+                    <Typography sx={{ color: 'text.secondary', fontSize: '0.82rem' }}>No step failures recorded</Typography>
+                  </Box>
+                )}
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Recent 10 runs */}
+          {stats.recent_runs?.length > 0 && (
+            <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+              <Box sx={{ px: 3, pt: 2, pb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CloudSyncIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.primary' }}>
+                  Recent activity
+                </Typography>
+                <Box sx={{ ml: 'auto' }}>
+                  <ViewToggle value={overviewView} onChange={saveView('admin_overview_view', setOverviewView)} />
+                </Box>
+              </Box>
+              {overviewView === 'table' ? (
+                <DataGrid
+                  rows={stats.recent_runs}
+                  getRowId={(r) => r.id}
+                  autoHeight
+                  disableRowSelectionOnClick
+                  pageSizeOptions={[10, 25]}
+                  initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
+                  sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none', borderRadius: 0 }}
+                  columns={[
+                    { field: 'user_email',   headerName: 'User',        flex: 1,   minWidth: 140, renderCell: (p) => <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{p.value || '—'}</Typography> },
+                    { field: 'config_name',  headerName: 'Config',      flex: 1,   minWidth: 120 },
+                    { field: 'instance_id',  headerName: 'Instance ID', flex: 1,   minWidth: 130, renderCell: (p) => <MonoValue val={p.value} /> },
+                    { field: 'report_id',    headerName: 'Report ID',   flex: 1,   minWidth: 130, renderCell: (p) => <MonoValue val={p.value} /> },
+                    { field: 'status',       headerName: 'Status',      width: 110, renderCell: (p) => <StatusChip status={p.value} sftp_skipped={p.row.sftp_skipped} /> },
+                    { field: 'duration_ms',  headerName: 'Duration',    width: 110, renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>{fmtMs(p.value)}</Typography> },
+                    { field: 'started_at',   headerName: 'Started',     width: 150, renderCell: (p) => <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif', whiteSpace: 'nowrap' }}>{fmtDate(p.value)}</Typography> },
+                  ]}
+                />
+              ) : (
+                <Box sx={{ p: 2 }}>
+                  <Grid container spacing={2}>
+                    {stats.recent_runs.map((r) => (
+                      <Grid item xs={12} sm={6} md={4} key={r.id}>
+                        <Card variant="outlined" sx={{ bgcolor: 'background.default', borderColor: 'divider' }}>
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem', fontWeight: 700, color: 'text.primary' }}>{r.config_name || '—'}</Typography>
+                              <StatusChip status={r.status} sftp_skipped={r.sftp_skipped} />
+                            </Box>
+                            {[
+                              { label: 'User',        val: r.user_email },
+                              { label: 'Instance ID', val: r.instance_id, mono: true },
+                              { label: 'Report ID',   val: r.report_id,   mono: true },
+                              { label: 'Duration',    val: fmtMs(r.duration_ms) },
+                              { label: 'Started',     val: fmtDate(r.started_at) },
+                            ].map(({ label, val, mono }) => (
+                              <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
+                                <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 76, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
+                                {mono ? <MonoValue val={val} /> : <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{val || '—'}</Typography>}
+                              </Box>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+            </Card>
+          )}
+        </Box>
+      )}
+
+      {/* ═══ TAB 1: RUNS ════════════════════════════════════════════════════ */}
+      {tab === 1 && (
+        <Box>
+          {/* Status filter row */}
+          <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+            {[
+              { key: 'all',     label: 'All',     color: 'text.secondary' },
+              { key: 'success', label: 'Success', color: '#6b8f71' },
+              { key: 'error',   label: 'Error',   color: '#b45050' },
+              { key: 'running', label: 'Running', color: accent },
+              { key: 'ps_only', label: 'PS Only', color: '#6495b4' },
+            ].map(({ key, label, color }) => {
+              const cnt = key === 'all'
+                ? runs.length
+                : key === 'ps_only'
+                  ? runs.filter(r => r.sftp_skipped && r.status === 'success').length
+                  : runs.filter(r => r.status === key).length
+              const isHex = color.startsWith('#')
+              return (
+                <Chip
+                  key={key}
+                  label={`${label} (${cnt})`}
+                  size="small"
+                  onClick={() => setRunStatusFilter(key)}
+                  sx={{
+                    cursor: 'pointer',
+                    bgcolor: runStatusFilter === key ? `${isHex ? color : accent}22` : 'transparent',
+                    color: runStatusFilter === key ? (isHex ? color : 'primary.main') : 'text.secondary',
+                    border: '1px solid',
+                    borderColor: runStatusFilter === key ? (isHex ? color : 'primary.main') : 'divider',
+                    fontFamily: '"Raleway", sans-serif',
+                    fontSize: '0.62rem',
+                    transition: 'all 0.15s ease',
+                  }}
+                />
+              )
+            })}
+          </Box>
+
+          <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+            <Box sx={{ px: 2.5, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', borderBottom: '1px solid', borderColor: 'divider' }}>
+              <ViewToggle value={runsView} onChange={saveView('admin_runs_view', setRunsView)} />
+            </Box>
+            {runsView === 'table' ? (
+              <DataGrid
+                rows={filteredRuns}
+                getRowId={(r) => r.id}
+                autoHeight
+                disableRowSelectionOnClick
+                pageSizeOptions={[25, 50, 100]}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none', borderRadius: 0 }}
+                columns={[
+                  { field: 'id',          headerName: '#',            width: 64,  renderCell: (p) => <Typography sx={{ fontSize: '0.68rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>{p.value}</Typography> },
+                  { field: 'user_email',  headerName: 'User',         flex: 1,   minWidth: 140,
+                    renderCell: (p) => (
+                      <Tooltip title={p.row.user_email || p.row.user_id || ''} arrow>
+                        <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.row.user_email || p.row.user_id || '—'}
+                        </Typography>
                       </Tooltip>
-                    </TableCell>
-                    <TableCell sx={cellSx}>
+                    ),
+                  },
+                  { field: 'config_name', headerName: 'Config',       flex: 1,   minWidth: 130,
+                    renderCell: (p) => (
                       <Box>
-                        <Typography sx={{ fontSize: '0.75rem', color: '#ede8d0', fontFamily: '"Raleway"' }}>{r.config_name || '—'}</Typography>
-                        {r.ps_process_name && (
-                          <Typography sx={{ fontSize: '0.62rem', color: '#5a5040', fontFamily: '"Raleway"', letterSpacing: '0.04em' }}>{r.ps_process_name}</Typography>
+                        <Typography sx={{ fontSize: '0.74rem', fontFamily: '"Raleway", sans-serif', color: 'text.primary' }}>{p.row.config_name || '—'}</Typography>
+                        {p.row.ps_process_name && <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>{p.row.ps_process_name}</Typography>}
+                      </Box>
+                    ),
+                  },
+                  { field: 'instance_id', headerName: 'Instance ID',  flex: 1,   minWidth: 130, renderCell: (p) => <MonoValue val={p.value} /> },
+                  { field: 'report_id',   headerName: 'Report ID',    flex: 1,   minWidth: 130, renderCell: (p) => <MonoValue val={p.value} /> },
+                  { field: 'status',      headerName: 'Status',       width: 110, renderCell: (p) => <StatusChip status={p.value} sftp_skipped={p.row.sftp_skipped} /> },
+                  { field: 'row_count',   headerName: 'Rows',         width: 80,  type: 'number',
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>{p.value != null ? p.value.toLocaleString() : '—'}</Typography>,
+                  },
+                  { field: 'duration_ms', headerName: 'Duration',     width: 110, renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>{fmtMs(p.value)}</Typography> },
+                  { field: 'failed_step', headerName: 'Step',         width: 100,
+                    renderCell: (p) => p.value
+                      ? <Chip label={p.value} size="small" sx={{ bgcolor: 'rgba(180,80,80,0.1)', color: '#b45050', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', height: 18 }} />
+                      : <Typography sx={{ fontSize: '0.68rem', color: 'text.disabled' }}>—</Typography>,
+                  },
+                  { field: 'started_at',  headerName: 'Started',      width: 150, renderCell: (p) => <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif', whiteSpace: 'nowrap' }}>{fmtDate(p.value)}</Typography> },
+                ]}
+              />
+            ) : (
+              <Box sx={{ p: 2 }}>
+                {!filteredRuns.length
+                  ? <Typography sx={{ color: 'text.disabled', textAlign: 'center', py: 6, fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' }}>No runs match the current filter</Typography>
+                  : (
+                    <Grid container spacing={2}>
+                      {filteredRuns.map((r) => (
+                        <Grid item xs={12} sm={6} md={4} key={r.id}>
+                          <Card variant="outlined" sx={{ bgcolor: 'background.default', borderColor: 'divider' }}>
+                            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem', fontWeight: 700, color: 'text.primary' }}>{r.config_name || '—'}</Typography>
+                                <StatusChip status={r.status} sftp_skipped={r.sftp_skipped} />
+                              </Box>
+                              {[
+                                { label: 'User',        val: r.user_email || r.user_id },
+                                { label: 'Process',     val: r.ps_process_name },
+                                { label: 'Instance ID', val: r.instance_id, mono: true },
+                                { label: 'Report ID',   val: r.report_id,   mono: true },
+                                { label: 'Rows',        val: r.row_count != null ? r.row_count.toLocaleString() : null },
+                                { label: 'Duration',    val: fmtMs(r.duration_ms) },
+                                { label: 'Failed Step', val: r.failed_step },
+                                { label: 'Started',     val: fmtDate(r.started_at) },
+                              ].filter(({ val }) => val).map(({ label, val, mono }) => (
+                                <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
+                                  <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 76, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
+                                  {mono ? <MonoValue val={val} /> : <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{val}</Typography>}
+                                </Box>
+                              ))}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  )
+                }
+              </Box>
+            )}
+          </Card>
+        </Box>
+      )}
+
+      {/* ═══ TAB 2: USERS ═══════════════════════════════════════════════════ */}
+      {tab === 2 && (
+        <Box>
+          {/* Controls row */}
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <TextField
+              size="small"
+              placeholder="Search by name or email…"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></InputAdornment> }}
+              sx={{ minWidth: 260, '& .MuiOutlinedInput-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+            <Button
+              variant="contained"
+              startIcon={<PersonAddIcon sx={{ fontSize: 16 }} />}
+              onClick={() => setInviteOpen(true)}
+              sx={{
+                bgcolor: 'primary.main', color: 'background.default',
+                fontFamily: '"Raleway", sans-serif', fontWeight: 700,
+                fontSize: '0.7rem', letterSpacing: '0.1em',
+                px: 2.5, py: 0.9, borderRadius: '1px',
+                boxShadow: `0 2px 12px ${accent}30`,
+                '&:hover': { bgcolor: 'primary.light' },
+              }}
+            >
+              Invite User
+            </Button>
+          </Box>
+
+          <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+            <Box sx={{ px: 2.5, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', borderBottom: '1px solid', borderColor: 'divider' }}>
+              <ViewToggle value={usersView} onChange={saveView('admin_users_view', setUsersView)} />
+            </Box>
+            {usersView === 'table' ? (
+              <DataGrid
+                rows={filteredUsers}
+                getRowId={(r) => r.id}
+                autoHeight
+                disableRowSelectionOnClick
+                pageSizeOptions={[25, 50, 100]}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none', borderRadius: 0 }}
+                columns={[
+                  {
+                    field: 'first_name', headerName: 'User', flex: 1, minWidth: 160,
+                    valueGetter: (_, row) => [row.first_name, row.last_name].filter(Boolean).join(' ') || '—',
+                    renderCell: (p) => {
+                      const isSelf = p.row.id === user.id
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', bgcolor: p.row.role === 'admin' ? `${accent}22` : 'rgba(128,128,128,0.12)' }}>
+                            {p.row.role === 'admin' ? <ShieldIcon sx={{ fontSize: 13, color: 'primary.main' }} /> : <PersonIcon sx={{ fontSize: 13, color: 'text.secondary' }} />}
+                          </Box>
+                          <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.primary', lineHeight: 1.2 }}>{p.value}</Typography>
+                              {isSelf && <Chip label="you" size="small" sx={{ height: 14, fontSize: '0.5rem', bgcolor: `${accent}18`, color: 'primary.main', px: 0 }} />}
+                            </Box>
+                            <Typography sx={{ fontSize: '0.58rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>{p.row.id.slice(0, 12)}…</Typography>
+                          </Box>
+                        </Box>
+                      )
+                    },
+                  },
+                  { field: 'email', headerName: 'Email', flex: 1, minWidth: 160, renderCell: (p) => <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{p.value}</Typography> },
+                  {
+                    field: 'role', headerName: 'Role', width: 150, sortable: false,
+                    renderCell: (p) => (
+                      <RoleSelect userId={p.row.id} currentRole={p.value} isSelf={p.row.id === user.id} onRoleChange={handleRoleChange} loadingId={roleLoadingId} />
+                    ),
+                  },
+                  { field: 'run_count', headerName: 'Runs', width: 80, type: 'number', renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.secondary' }}>{p.value ?? 0}</Typography> },
+                  { field: 'onboarded', headerName: 'Onboarded', width: 100, renderCell: (p) => p.value ? <CheckCircleOutlineIcon sx={{ fontSize: 16, color: '#6b8f71' }} /> : <Typography sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>—</Typography> },
+                  { field: 'last_seen_at', headerName: 'Last seen', width: 120, renderCell: (p) => <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{p.value ? new Date(p.value).toLocaleDateString() : '—'}</Typography> },
+                  {
+                    field: 'actions', headerName: 'Actions', width: 90, sortable: false,
+                    renderCell: (p) => (
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="Edit name"><IconButton size="small" onClick={() => openEdit(p.row)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}><EditIcon sx={{ fontSize: 15 }} /></IconButton></Tooltip>
+                        {p.row.id !== user.id && (
+                          <Tooltip title="Delete user"><IconButton size="small" onClick={() => { setDeleteDialog({ id: p.row.id, email: p.row.email }); setDeleteClerk(false) }} sx={{ color: 'text.secondary', '&:hover': { color: '#c98f8f' } }}><DeleteIcon sx={{ fontSize: 15 }} /></IconButton></Tooltip>
                         )}
                       </Box>
-                    </TableCell>
-                    <TableCell sx={cellSx}>{mono(r.instance_id)}</TableCell>
-                    <TableCell sx={cellSx}>{mono(r.report_id)}</TableCell>
-                    <TableCell sx={cellSx}>
-                      <StatusChip status={r.status} sftp_skipped={r.sftp_skipped} />
-                    </TableCell>
-                    <TableCell sx={{ ...cellSx, textAlign: 'right' }}>{r.row_count != null ? r.row_count.toLocaleString() : '—'}</TableCell>
-                    <TableCell sx={cellSx}>{fmtMs(r.duration_ms)}</TableCell>
-                    <TableCell sx={{ ...cellSx, whiteSpace: 'nowrap', fontSize: '0.68rem', color: '#7a7060' }}>{fmtDate(r.started_at)}</TableCell>
-                    <TableCell sx={cellSx}>
-                      {r.error_detail && (
-                        <Tooltip title={r.error_detail} arrow>
-                          <Typography sx={{ fontSize: '0.62rem', color: '#b45050', fontFamily: '"Raleway"', cursor: 'default', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {r.error_detail}
-                          </Typography>
-                        </Tooltip>
-                      )}
-                      {r.sftp_skipped && !r.error_detail && (
-                        <Typography sx={{ fontSize: '0.62rem', color: '#5a7080', fontFamily: '"Raleway"' }}>
-                          {r.skip_reason || 'SFTP skipped'}
-                        </Typography>
-                      )}
-                    </TableCell>
-                  </TableRow>
+                    ),
+                  },
+                ]}
+              />
+            ) : (
+              <Box sx={{ p: 2 }}>
+                {!filteredUsers.length
+                  ? <Typography sx={{ color: 'text.disabled', textAlign: 'center', py: 6, fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' }}>{userSearch ? 'No users match the search' : 'No users yet'}</Typography>
+                  : (
+                    <Grid container spacing={2}>
+                      {filteredUsers.map((u) => {
+                        const name   = [u.first_name, u.last_name].filter(Boolean).join(' ') || '—'
+                        const isSelf = u.id === user.id
+                        return (
+                          <Grid item xs={12} sm={6} md={4} key={u.id}>
+                            <Card variant="outlined" sx={{ bgcolor: 'background.default', borderColor: 'divider' }}>
+                              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                                  <Box sx={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', bgcolor: u.role === 'admin' ? `${accent}22` : 'rgba(128,128,128,0.12)' }}>
+                                    {u.role === 'admin' ? <ShieldIcon sx={{ fontSize: 15, color: 'primary.main' }} /> : <PersonIcon sx={{ fontSize: 15, color: 'text.secondary' }} />}
+                                  </Box>
+                                  <Box sx={{ flex: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem', fontWeight: 700, color: 'text.primary' }}>{name}</Typography>
+                                      {isSelf && <Chip label="you" size="small" sx={{ height: 15, fontSize: '0.5rem', bgcolor: `${accent}18`, color: 'primary.main', px: 0 }} />}
+                                    </Box>
+                                    <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{u.email}</Typography>
+                                  </Box>
+                                </Box>
+                                {[
+                                  { label: 'Role',      custom: <RoleSelect userId={u.id} currentRole={u.role} isSelf={isSelf} onRoleChange={handleRoleChange} loadingId={roleLoadingId} /> },
+                                  { label: 'Runs',      val: String(u.run_count ?? 0) },
+                                  { label: 'Onboarded', val: u.onboarded ? '✓ Yes' : 'No' },
+                                  { label: 'Last seen', val: u.last_seen_at ? new Date(u.last_seen_at).toLocaleDateString() : '—' },
+                                ].map(({ label, val, custom }) => (
+                                  <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.6, alignItems: 'center' }}>
+                                    <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 70, flexShrink: 0 }}>{label}</Typography>
+                                    {custom || <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{val}</Typography>}
+                                  </Box>
+                                ))}
+                                <Box sx={{ display: 'flex', gap: 0.5, mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                                  <Tooltip title="Edit name"><IconButton size="small" onClick={() => openEdit(u)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}><EditIcon sx={{ fontSize: 15 }} /></IconButton></Tooltip>
+                                  {!isSelf && <Tooltip title="Delete user"><IconButton size="small" onClick={() => { setDeleteDialog({ id: u.id, email: u.email }); setDeleteClerk(false) }} sx={{ color: 'text.secondary', '&:hover': { color: '#c98f8f' } }}><DeleteIcon sx={{ fontSize: 15 }} /></IconButton></Tooltip>}
+                                </Box>
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        )
+                      })}
+                    </Grid>
+                  )
+                }
+              </Box>
+            )}
+          </Card>
+        </Box>
+      )}
+
+      {/* ═══ TAB 3: AUDIT LOG ═══════════════════════════════════════════════ */}
+      {tab === 3 && (
+        <Box>
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center' }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem' }}>Event type</InputLabel>
+              <Select
+                value={logTypeFilter}
+                label="Event type"
+                onChange={(e) => setLogTypeFilter(e.target.value)}
+                sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem' }}
+              >
+                <MenuItem value="all">All events</MenuItem>
+                {logEventTypes.map((t) => (
+                  <MenuItem key={t} value={t} sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem' }}>{t}</MenuItem>
                 ))}
-                {!runs.length && (
-                  <TableRow>
-                    <TableCell colSpan={10} sx={{ ...cellSx, textAlign: 'center', color: '#3a3428', py: 4 }}>
-                      No runs yet — trigger a run from the Dashboard to see tracking data here.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+              </Select>
+            </FormControl>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.65rem', color: 'text.disabled' }}>
+              {filteredLogs.length} event{filteredLogs.length !== 1 ? 's' : ''}
+            </Typography>
           </Box>
-        </Card>
-      )}
 
-      {/* ── tab 1: Users ─────────────────────────────────────────────────── */}
-      {tab === 1 && (
-        <Card variant="outlined" sx={{ bgcolor: '#14161a', borderColor: 'rgba(201,168,76,0.1)' }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'rgba(201,168,76,0.03)' }}>
-                <TableCell sx={headSx}>Email</TableCell>
-                <TableCell sx={headSx}>Name</TableCell>
-                <TableCell sx={headSx}>Role</TableCell>
-                <TableCell sx={headSx}>Runs</TableCell>
-                <TableCell sx={headSx}>Onboarded</TableCell>
-                <TableCell sx={headSx}>Last seen</TableCell>
-                <TableCell sx={headSx}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id} hover sx={{ '&:hover': { bgcolor: 'rgba(201,168,76,0.025)' } }}>
-                  <TableCell sx={cellSx}>{u.email}</TableCell>
-                  <TableCell sx={{ ...cellSx, color: '#7a7060' }}>
-                    {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
-                  </TableCell>
-                  <TableCell sx={cellSx}>
-                    <Chip label={u.role} size="small"
-                      sx={{ bgcolor: u.role === 'admin' ? 'rgba(201,168,76,0.15)' : 'rgba(255,255,255,0.04)', color: u.role === 'admin' ? '#c9a84c' : '#5a5040', fontFamily: '"Raleway"', fontSize: '0.6rem', height: 20 }} />
-                  </TableCell>
-                  <TableCell sx={{ ...cellSx, textAlign: 'right' }}>{u.run_count ?? 0}</TableCell>
-                  <TableCell sx={cellSx}>{u.onboarded ? <span style={{ color: '#6b8f71' }}>✓</span> : <span style={{ color: '#3a3428' }}>—</span>}</TableCell>
-                  <TableCell sx={{ ...cellSx, fontSize: '0.68rem', color: '#7a7060' }}>
-                    {u.last_seen_at ? new Date(u.last_seen_at).toLocaleDateString() : '—'}
-                  </TableCell>
-                  <TableCell sx={cellSx}>
-                    {u.id !== user.id && (
-                      <Typography
-                        onClick={() => handleRoleToggle(u.id, u.role)}
-                        sx={{ cursor: 'pointer', fontSize: '0.65rem', color: '#5a5040', fontFamily: '"Raleway"', '&:hover': { color: '#c9a84c' } }}
-                      >
-                        {u.role === 'admin' ? 'Remove admin' : 'Make admin'}
+          <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+            <Box sx={{ px: 2.5, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', borderBottom: '1px solid', borderColor: 'divider' }}>
+              <ViewToggle value={logsView} onChange={saveView('admin_logs_view', setLogsView)} />
+            </Box>
+            {logsView === 'table' ? (
+              <DataGrid
+                rows={filteredLogs}
+                getRowId={(r) => r.id}
+                autoHeight
+                disableRowSelectionOnClick
+                pageSizeOptions={[25, 50, 100]}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none', borderRadius: 0 }}
+                columns={[
+                  {
+                    field: 'created_at', headerName: 'When', width: 170,
+                    renderCell: (p) => (
+                      <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif', whiteSpace: 'nowrap' }}>
+                        {p.value ? new Date(p.value).toLocaleString() : '—'}
                       </Typography>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!users.length && (
-                <TableRow>
-                  <TableCell colSpan={7} sx={{ ...cellSx, textAlign: 'center', color: '#3a3428', py: 4 }}>No users yet</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Card>
+                    ),
+                  },
+                  {
+                    field: 'user_name', headerName: 'User', flex: 1, minWidth: 140,
+                    renderCell: (p) => (
+                      <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>
+                        {p.value || '—'}
+                      </Typography>
+                    ),
+                  },
+                  {
+                    field: 'event_type', headerName: 'Event', flex: 1, minWidth: 160,
+                    renderCell: (p) => {
+                      const t = p.value || ''
+                      const bg    = t.startsWith('run') ? 'rgba(100,149,180,0.12)' : t.includes('deleted') ? 'rgba(180,80,80,0.12)' : t.includes('invite') ? 'rgba(107,143,113,0.12)' : t.includes('role') ? `${accent}15` : 'rgba(128,128,128,0.1)'
+                      const color = t.startsWith('run') ? '#6495b4'  : t.includes('deleted') ? '#b45050' : t.includes('invite') ? '#6b8f71' : t.includes('role') ? accent : theme.palette.text.secondary
+                      return <Chip label={t} size="small" sx={{ bgcolor: bg, color, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', height: 19 }} />
+                    },
+                  },
+                  {
+                    field: 'detail', headerName: 'Detail', flex: 2, minWidth: 200, sortable: false,
+                    renderCell: (p) => (
+                      <Tooltip title={<pre style={{ margin: 0, fontFamily: 'inherit', fontSize: 11 }}>{JSON.stringify(p.value, null, 2)}</pre>} arrow>
+                        <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.66rem', color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'default' }}>
+                          {JSON.stringify(p.value)}
+                        </Typography>
+                      </Tooltip>
+                    ),
+                  },
+                  {
+                    field: 'ip_address', headerName: 'IP', width: 130,
+                    renderCell: (p) => (
+                      <Typography sx={{ fontSize: '0.68rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>
+                        {p.value || '—'}
+                      </Typography>
+                    ),
+                  },
+                ]}
+              />
+            ) : (
+              <Box sx={{ p: 2 }}>
+                {!filteredLogs.length
+                  ? <Typography sx={{ color: 'text.disabled', textAlign: 'center', py: 6, fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' }}>No audit events</Typography>
+                  : (
+                    <Grid container spacing={2}>
+                      {filteredLogs.map((entry) => {
+                        const t = entry.event_type || ''
+                        const chipBg    = t.startsWith('run') ? 'rgba(100,149,180,0.12)' : t.includes('deleted') ? 'rgba(180,80,80,0.12)' : t.includes('invite') ? 'rgba(107,143,113,0.12)' : t.includes('role') ? `${accent}15` : 'rgba(128,128,128,0.1)'
+                        const chipColor = t.startsWith('run') ? '#6495b4' : t.includes('deleted') ? '#b45050' : t.includes('invite') ? '#6b8f71' : t.includes('role') ? accent : theme.palette.text.secondary
+                        return (
+                          <Grid item xs={12} sm={6} md={4} key={entry.id}>
+                            <Card variant="outlined" sx={{ bgcolor: 'background.default', borderColor: 'divider' }}>
+                              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                                  <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>
+                                    {entry.created_at ? new Date(entry.created_at).toLocaleString() : '—'}
+                                  </Typography>
+                                  <Chip label={t || '—'} size="small" sx={{ bgcolor: chipBg, color: chipColor, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', height: 19 }} />
+                                </Box>
+                                {[
+                                  { label: 'User', val: entry.user_name },
+                                  { label: 'IP',   val: entry.ip_address },
+                                ].map(({ label, val }) => (
+                                  <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
+                                    <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 50, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
+                                    <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{val || '—'}</Typography>
+                                  </Box>
+                                ))}
+                                {entry.detail && (
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', mb: 0.3 }}>Detail</Typography>
+                                    <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.62rem', color: 'text.secondary', wordBreak: 'break-all', bgcolor: 'background.paper', p: 0.75, borderRadius: '2px', border: '1px solid', borderColor: 'divider' }}>
+                                      {JSON.stringify(entry.detail)}
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </Grid>
+                        )
+                      })}
+                    </Grid>
+                  )
+                }
+              </Box>
+            )}
+          </Card>
+        </Box>
       )}
 
-      {/* ── tab 2: Audit log ─────────────────────────────────────────────── */}
-      {tab === 2 && (
-        <Card variant="outlined" sx={{ bgcolor: '#14161a', borderColor: 'rgba(201,168,76,0.1)' }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'rgba(201,168,76,0.03)' }}>
-                <TableCell sx={headSx}>User</TableCell>
-                <TableCell sx={headSx}>Event</TableCell>
-                <TableCell sx={headSx}>Detail</TableCell>
-                <TableCell sx={headSx}>IP</TableCell>
-                <TableCell sx={headSx}>When</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {logs.map((entry) => (
-                <TableRow key={entry.id} hover sx={{ '&:hover': { bgcolor: 'rgba(201,168,76,0.025)' } }}>
-                  <TableCell sx={{ ...cellSx, color: '#7a7060' }}>{entry.user_name || entry.user_id || '—'}</TableCell>
-                  <TableCell sx={cellSx}>
-                    <Chip label={entry.event_type} size="small"
-                      sx={{ bgcolor: entry.event_type.startsWith('run') ? 'rgba(100,149,180,0.1)' : 'rgba(201,168,76,0.07)', color: entry.event_type.startsWith('run') ? '#6495b4' : '#7a6040', fontFamily: '"Raleway"', fontSize: '0.58rem', height: 18 }} />
-                  </TableCell>
-                  <TableCell sx={{ ...cellSx, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: '#5a5040', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <Tooltip title={JSON.stringify(entry.detail, null, 2)} arrow>
-                      <span>{JSON.stringify(entry.detail)}</span>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell sx={{ ...cellSx, fontSize: '0.68rem', color: '#4a4030' }}>{entry.ip_address || '—'}</TableCell>
-                  <TableCell sx={{ ...cellSx, fontSize: '0.68rem', color: '#7a7060', whiteSpace: 'nowrap' }}>
-                    {entry.created_at ? new Date(entry.created_at).toLocaleString() : '—'}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!logs.length && (
-                <TableRow>
-                  <TableCell colSpan={5} sx={{ ...cellSx, textAlign: 'center', color: '#3a3428', py: 4 }}>No audit events yet</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
+      {/* ── Invite user dialog ────────────────────────────────────────────── */}
+      <InviteDialog
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onInvited={handleInvited}
+        token={token}
+      />
+
+      {/* ── Delete user dialog ────────────────────────────────────────────── */}
+      <Dialog open={Boolean(deleteDialog)} onClose={() => setDeleteDialog(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.3rem', color: 'text.primary', pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningAmberIcon sx={{ fontSize: 20, color: '#b45050' }} /> Delete user?
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', color: 'text.secondary', lineHeight: 1.7 }}>
+            Remove <strong style={{ color: theme.palette.text.primary }}>{deleteDialog?.email}</strong> from the platform.
+            Their run history and audit records will also be deleted.
+          </Typography>
+          <Divider sx={{ my: 2, borderColor: 'divider' }} />
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={deleteClerk}
+                onChange={(e) => setDeleteClerk(e.target.checked)}
+                sx={{ '& .MuiSwitch-thumb': { bgcolor: deleteClerk ? '#b45050' : undefined } }}
+              />
+            }
+            label={
+              <Box>
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem', color: 'text.primary' }}>
+                  Also delete from Clerk
+                </Typography>
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.65rem', color: 'text.disabled', lineHeight: 1.4 }}>
+                  If off, the user can still log in via Clerk — a new local account will be created on next sign-in.
+                </Typography>
+              </Box>
+            }
+            sx={{ alignItems: 'flex-start', mt: 0.5 }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setDeleteDialog(null)} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteUser} disabled={actionLoading} variant="contained" startIcon={actionLoading ? <CircularProgress size={14} /> : <DeleteIcon sx={{ fontSize: 15 }} />} sx={{ bgcolor: '#8f4a4a', '&:hover': { bgcolor: '#b45050' }, fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            {actionLoading ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Edit user dialog ──────────────────────────────────────────────── */}
+      <Dialog open={Boolean(editDialog)} onClose={() => setEditDialog(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.3rem', color: 'text.primary', pb: 1 }}>
+          Edit user
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
+            <TextField
+              label="First name"
+              size="small"
+              fullWidth
+              value={editForm.first_name}
+              onChange={(e) => setEditForm((p) => ({ ...p, first_name: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+            <TextField
+              label="Last name"
+              size="small"
+              fullWidth
+              value={editForm.last_name}
+              onChange={(e) => setEditForm((p) => ({ ...p, last_name: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.65rem', color: 'text.disabled' }}>
+              Email address is managed by Clerk and cannot be changed here.
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setEditDialog(null)} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            Cancel
+          </Button>
+          <Button onClick={handleEditSave} disabled={actionLoading} variant="contained" startIcon={actionLoading ? <CircularProgress size={14} /> : <SaveIcon sx={{ fontSize: 15 }} />} sx={{ bgcolor: 'primary.main', color: 'background.default', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            {actionLoading ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   )
 }

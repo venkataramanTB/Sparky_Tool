@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Box, Typography, Button, Alert, CircularProgress,
   Select, MenuItem, Chip, Grid, Card, CardContent,
-  Table, TableBody, TableCell, TableHead, TableRow,
   Tooltip, IconButton,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
+import { DataGrid } from '@mui/x-data-grid'
 import MythicsLogo from '../assets/MythicsLogo'
+import ViewToggle from '../components/ViewToggle'
+import { getDataGridSx } from '../utils/dataGridSx'
 import ContentCopyIcon        from '@mui/icons-material/ContentCopy'
 import CheckIcon              from '@mui/icons-material/Check'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
@@ -142,6 +144,14 @@ export default function Dashboard() {
   const [pageLoading,    setPageLoading]    = useState(false)
   const [running,        setRunning]        = useState(false)
   const [error,          setError]          = useState(null)
+  const [runsView,       setRunsView]       = useState(
+    () => localStorage.getItem('dashboard_runs_view') || 'table'
+  )
+
+  const handleRunsViewChange = (v) => {
+    setRunsView(v)
+    localStorage.setItem('dashboard_runs_view', v)
+  }
 
   const selectedConfig = useMemo(
     () => configs.find((c) => c.id === activeConfigId) || null,
@@ -402,88 +412,104 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* ── recent runs table ──────────────────────────────────────────────── */}
+        {/* ── recent runs ───────────────────────────────────────────────────── */}
         {runs.length > 0 && (
           <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', mb: 5 }}>
-            <Box sx={{
-              px: 3, py: 2,
-              display: 'flex', alignItems: 'center', gap: 1.5,
-              borderBottom: '1px solid', borderColor: 'divider',
-            }}>
+            {/* Header */}
+            <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
               <CloudSyncIcon sx={{ fontSize: 14, color: 'primary.main' }} />
               <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.primary' }}>
                 Recent Runs
               </Typography>
-              <Chip
-                label={runs.length}
-                size="small"
-                sx={{ height: 16, fontSize: '0.55rem', fontFamily: '"JetBrains Mono", monospace', bgcolor: `${accent}18`, color: 'primary.main' }}
-              />
+              <Chip label={runs.length} size="small" sx={{ height: 16, fontSize: '0.55rem', fontFamily: '"JetBrains Mono", monospace', bgcolor: `${accent}18`, color: 'primary.main' }} />
+              <Box sx={{ ml: 'auto' }}>
+                <ViewToggle value={runsView} onChange={handleRunsViewChange} />
+              </Box>
             </Box>
 
-            <Box sx={{ overflowX: 'auto' }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={headSx}>Config</TableCell>
-                    <TableCell sx={headSx}>Instance ID</TableCell>
-                    <TableCell sx={headSx}>Report ID</TableCell>
-                    <TableCell sx={headSx}>Status</TableCell>
-                    <TableCell sx={{ ...headSx, textAlign: 'right' }}>Rows</TableCell>
-                    <TableCell sx={headSx}>Duration</TableCell>
-                    <TableCell sx={headSx}>When</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {runs.slice(0, 12).map((r) => (
-                    <TableRow key={r.id} hover sx={{ '&:hover': { bgcolor: `${accent}06` } }}>
-                      <TableCell sx={cellSx}>
-                        <Typography sx={{ fontSize: '0.74rem', color: 'text.primary', fontFamily: '"Raleway", sans-serif' }}>
-                          {r.config_name || '—'}
-                        </Typography>
-                        {r.ps_process_name && (
-                          <Typography sx={{ fontSize: '0.58rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>
-                            {r.ps_process_name}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell sx={cellSx}><MonoCopy val={r.instance_id} /></TableCell>
-                      <TableCell sx={cellSx}><MonoCopy val={r.report_id} /></TableCell>
-                      <TableCell sx={cellSx}>
-                        <StatusPill status={r.status} sftp_skipped={r.sftp_skipped} />
-                      </TableCell>
-                      <TableCell sx={{ ...cellSx, textAlign: 'right', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>
-                        {r.row_count != null ? r.row_count.toLocaleString() : <span style={{ color: theme.palette.text.disabled }}>—</span>}
-                      </TableCell>
-                      <TableCell sx={{ ...cellSx, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>
-                        {fmtMs(r.duration_ms)}
-                      </TableCell>
-                      <TableCell sx={{ ...cellSx, fontSize: '0.68rem', whiteSpace: 'nowrap' }}>
-                        {r.status === 'running' ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                            <Box sx={{
-                              width: 6, height: 6, borderRadius: '50%', bgcolor: accent, flexShrink: 0,
-                              animation: 'dashPulse 1.4s ease-in-out infinite',
-                              '@keyframes dashPulse': {
-                                '0%, 100%': { opacity: 1, transform: 'scale(1)' },
-                                '50%':      { opacity: 0.35, transform: 'scale(0.7)' },
-                              },
-                            }} />
-                            <Typography sx={{ fontSize: '0.68rem', color: 'primary.main', fontFamily: '"Raleway", sans-serif' }}>
-                              Running
-                            </Typography>
+            {/* DataGrid view */}
+            {runsView === 'table' ? (
+              <DataGrid
+                rows={runs}
+                getRowId={(r) => r.id}
+                autoHeight
+                disableRowSelectionOnClick
+                pageSizeOptions={[10, 25, 50]}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                sx={{ ...getDataGridSx(accent, theme.palette.mode), border: 'none', borderRadius: 0 }}
+                columns={[
+                  {
+                    field: 'config_name', headerName: 'Config', flex: 1.2, minWidth: 140,
+                    renderCell: (p) => (
+                      <Box>
+                        <Typography sx={{ fontSize: '0.74rem', fontFamily: '"Raleway", sans-serif', color: 'text.primary' }}>{p.row.config_name || '—'}</Typography>
+                        {p.row.ps_process_name && <Typography sx={{ fontSize: '0.58rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>{p.row.ps_process_name}</Typography>}
+                      </Box>
+                    ),
+                  },
+                  { field: 'instance_id', headerName: 'Instance ID', flex: 1, minWidth: 130, renderCell: (p) => <MonoCopy val={p.value} /> },
+                  { field: 'report_id',   headerName: 'Report ID',   flex: 1, minWidth: 130, renderCell: (p) => <MonoCopy val={p.value} /> },
+                  { field: 'status', headerName: 'Status', width: 110, renderCell: (p) => <StatusPill status={p.value} sftp_skipped={p.row.sftp_skipped} /> },
+                  { field: 'row_count', headerName: 'Rows', width: 80, type: 'number',
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>{p.value != null ? p.value.toLocaleString() : '—'}</Typography>,
+                  },
+                  { field: 'duration_ms', headerName: 'Duration', width: 110,
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>{fmtMs(p.value)}</Typography>,
+                  },
+                  {
+                    field: 'started_at', headerName: 'When', width: 120,
+                    renderCell: (p) => p.row.status === 'running' ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: accent, flexShrink: 0, animation: 'dashPulse 1.4s ease-in-out infinite', '@keyframes dashPulse': { '0%,100%': { opacity: 1, transform: 'scale(1)' }, '50%': { opacity: 0.35, transform: 'scale(0.7)' } } }} />
+                        <Typography sx={{ fontSize: '0.68rem', color: 'primary.main', fontFamily: '"Raleway", sans-serif' }}>Running</Typography>
+                      </Box>
+                    ) : (
+                      <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{timeAgo(p.value)}</Typography>
+                    ),
+                  },
+                ]}
+              />
+            ) : (
+              /* Card view */
+              <Box sx={{ p: 2 }}>
+                <Grid container spacing={2}>
+                  {runs.map((r) => (
+                    <Grid item xs={12} sm={6} md={4} key={r.id}>
+                      <Card variant="outlined" sx={{ bgcolor: 'background.default', borderColor: 'divider', height: '100%' }}>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', fontWeight: 700, color: 'text.primary' }}>{r.config_name || '—'}</Typography>
+                            <StatusPill status={r.status} sftp_skipped={r.sftp_skipped} />
                           </Box>
-                        ) : (
-                          <Typography component="span" sx={{ color: 'text.secondary', fontSize: '0.68rem', fontFamily: '"Raleway", sans-serif' }}>
-                            {timeAgo(r.started_at)}
-                          </Typography>
-                        )}
-                      </TableCell>
-                    </TableRow>
+                          {r.ps_process_name && <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace', mb: 1.5 }}>{r.ps_process_name}</Typography>}
+                          {[
+                            { label: 'Instance ID', val: r.instance_id, mono: true },
+                            { label: 'Report ID',   val: r.report_id,   mono: true },
+                          ].map(({ label, val, mono }) => (
+                            <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.75, alignItems: 'flex-start' }}>
+                              <Typography sx={{ fontSize: '0.54rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 80, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
+                              <MonoCopy val={val} />
+                            </Box>
+                          ))}
+                          <Box sx={{ display: 'flex', gap: 2, mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider', flexWrap: 'wrap' }}>
+                            {[
+                              { label: 'Rows',     val: r.row_count != null ? r.row_count.toLocaleString() : '—' },
+                              { label: 'Duration', val: fmtMs(r.duration_ms) },
+                              { label: 'When',     val: r.status === 'running' ? 'Running…' : timeAgo(r.started_at) },
+                            ].map(({ label, val }) => (
+                              <Box key={label}>
+                                <Typography sx={{ fontSize: '0.52rem', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</Typography>
+                                <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.secondary' }}>{val}</Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Grid>
                   ))}
-                </TableBody>
-              </Table>
-            </Box>
+                </Grid>
+              </Box>
+            )}
           </Card>
         )}
 
