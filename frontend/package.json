@@ -14,7 +14,7 @@
     "@emotion/styled": "^11.13.0",
     "@mui/icons-material": "^5.16.0",
     "@mui/material": "^5.16.0",
-    "@mui/x-data-grid": "^9.3.0",
+    "@mui/x-data-grid": "^7.29.13",
     "@tanstack/react-table": "^8.20.5",
     "axios": "^1.7.7",
     "gsap": "^3.15.0",
