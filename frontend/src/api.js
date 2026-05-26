@@ -1,7 +1,12 @@
 import axios from 'axios'
 
+// VITE_API_URL is the backend origin (no trailing slash, no /api).
+//   Local dev  → leave empty; the Vite dev-server proxy rewrites /api → BACKEND_URL
+//   Vercel     → set to your Render URL, e.g. https://sparky-tool.onrender.com
+const _origin = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
 const client = axios.create({
-  baseURL: '/api',
+  baseURL: _origin ? `${_origin}/api` : '/api',
   headers: { 'Content-Type': 'application/json' },
 })
 
