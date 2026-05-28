@@ -1,7 +1,7 @@
 import os
 import httpx
 from jose import jwt, JWTError
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -111,6 +111,7 @@ def get_current_user_id(
 
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
@@ -152,6 +153,11 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(500, "User record missing after upsert")
+
+    # Cache the verified identity on request.state so the wide-event middleware
+    # can read it without re-parsing or re-verifying the JWT.
+    request.state.auth_user_id   = user.id
+    request.state.auth_user_name = f"{user.first_name} {user.last_name}".strip() or user.email
 
     if is_new:
         log.info("New user registered: %s (%s)", user.email, user_id)

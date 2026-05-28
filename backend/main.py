@@ -1,7 +1,5 @@
 import asyncio as _asyncio
-import base64 as _base64
 import httpx
-import json as _json_mod
 import os as _os
 import time as _time
 import uuid as _uuid
@@ -53,12 +51,11 @@ async def log_requests(request: Request, call_next):
     if not path.startswith("/assets/") and path not in ("/favicon.ico",):
         log.info("%-6s %-55s %3d  %d ms", request.method, path, response.status_code, elapsed)
 
-    # Emit wide event for all v2 API calls (fire-and-forget)
+    # Emit wide event for all v2 API calls (fire-and-forget).
+    # User identity comes from request.state, set by get_current_user after
+    # full JWT signature verification — never from an unverified token decode.
     if _v2_enabled and path.startswith("/api/v2/"):
-        auth_header = request.headers.get("Authorization", "")
-        user_id = None
-        if auth_header.startswith("Bearer "):
-            user_id = _decode_jwt_sub(auth_header[7:])
+        user_id = getattr(request.state, "auth_user_id", None)
         _asyncio.create_task(_emit_wide_event(
             path, request.method, response.status_code, elapsed, user_id, request_id,
         ))
@@ -70,18 +67,6 @@ _cache: dict = {}
 _v2_enabled = False
 
 # ── Wide-event middleware helpers ─────────────────────────────────────────────
-
-def _decode_jwt_sub(token: str) -> str | None:
-    """Extract the 'sub' claim from a JWT without verifying the signature (observability only)."""
-    try:
-        parts = token.split(".")
-        if len(parts) != 3:
-            return None
-        padding = "=" * (-len(parts[1]) % 4)
-        payload = _json_mod.loads(_base64.urlsafe_b64decode(parts[1] + padding))
-        return payload.get("sub")
-    except Exception:
-        return None
 
 
 _PATH_EVENT_MAP: list[tuple[str, str, str]] = [
