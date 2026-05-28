@@ -927,11 +927,12 @@ export default function Settings() {
       }}>
         {error && (
           <Alert severity="error" onClose={() => setError(null)} sx={{ flex: 1, minWidth: 0, py: 0.5, bgcolor: 'rgba(143,74,74,0.1)', border: '1px solid rgba(143,74,74,0.3)', color: isDark ? '#c98f8f' : '#8f4a4a', borderRadius: '3px', '& .MuiAlert-icon': { color: '#8f4a4a' } }}>
-            <Typography>
-              {typeof winTestStatus.message === 'string'
-                ? winTestStatus.message
-                : JSON.stringify(winTestStatus.message)}
-            </Typography>
+            {typeof error === 'string'
+              ? error
+              : Array.isArray(error)
+                ? error.map((e) => e.msg || JSON.stringify(e)).join(', ')
+                : error?.msg || JSON.stringify(error)
+            }
           </Alert>
         )}
         {success && (
