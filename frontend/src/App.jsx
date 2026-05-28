@@ -5,10 +5,11 @@ import Topbar from './components/Topbar'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Admin from './pages/Admin'
+import Preferences from './pages/Preferences'
 import SignInPage from './pages/SignIn'
 import { useAuth } from './AuthContext'
 
-const VALID_ROUTES = ['dashboard', 'settings', 'admin']
+const VALID_ROUTES = ['dashboard', 'settings', 'admin', 'preferences']
 
 function getRoute() {
   const h = window.location.hash.slice(1)
@@ -47,9 +48,10 @@ export default function App() {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
       <Topbar route={route} navigate={navigate} user={user} onSignOut={signOut} />
       <Box component="main" sx={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
-        {route === 'dashboard' && <Dashboard />}
-        {route === 'settings'  && <Settings />}
-        {route === 'admin'     && <Admin />}
+        {route === 'dashboard'   && <Dashboard />}
+        {route === 'settings'    && <Settings />}
+        {route === 'admin'       && <Admin />}
+        {route === 'preferences' && <Preferences />}
       </Box>
     </Box>
   )

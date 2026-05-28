@@ -476,6 +476,11 @@ async def analyze_file(
         colors=", ".join(_GEMINI_COLORS),
     )
 
+    prompt_tokens = 0
+    completion_tokens = 0
+    reasoning_tokens = 0
+    cached_tokens = 0
+
     try:
         if provider == "gemini":
             genai.configure(api_key=api_key)
@@ -488,6 +493,11 @@ async def analyze_file(
             )
             response = gm.generate_content(prompt)
             chart_spec = _extract_json(response.text)
+            if hasattr(response, "usage_metadata") and response.usage_metadata:
+                u = response.usage_metadata
+                prompt_tokens     = getattr(u, "prompt_token_count", 0) or 0
+                completion_tokens = getattr(u, "candidates_token_count", 0) or 0
+                cached_tokens     = getattr(u, "cached_content_token_count", 0) or 0
 
         elif provider in ("openai", "grok", "generic"):
             client_kwargs = {"api_key": api_key}
@@ -503,6 +513,9 @@ async def analyze_file(
                 temperature=0.2,
             )
             chart_spec = json.loads(resp.choices[0].message.content)
+            if resp.usage:
+                prompt_tokens     = resp.usage.prompt_tokens or 0
+                completion_tokens = resp.usage.completion_tokens or 0
 
         elif provider == "anthropic":
             ant = _anthropic_sdk.Anthropic(api_key=api_key)
@@ -513,6 +526,9 @@ async def analyze_file(
             )
             raw = msg.content[0].text
             chart_spec = _extract_json(raw)
+            if msg.usage:
+                prompt_tokens     = msg.usage.input_tokens or 0
+                completion_tokens = msg.usage.output_tokens or 0
 
         else:
             raise HTTPException(400, f"Unknown provider: {provider}")
@@ -526,16 +542,44 @@ async def analyze_file(
         log.error("AI provider call failed provider=%s: %s", provider, exc)
         raise HTTPException(502, f"AI provider error: {exc}") from exc
 
+    # ── Record conversation + token usage ────────────────────────────────────
+    try:
+        from routers.conversations import record_analysis_conversation
+        conv = record_analysis_conversation(
+            db,
+            user_id=user.id,
+            filename=fname,
+            provider=provider,
+            model_id_str=model_id,
+            ai_model_db_id=db_model.id if db_model else None,
+            prompt=prompt[:500],
+            response_text=json.dumps(chart_spec.get("summary", ""))[:500],
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            reasoning_tokens=reasoning_tokens,
+            cached_tokens=cached_tokens,
+        )
+        conversation_id = conv.id
+    except Exception as exc:
+        log.warning("conversation record failed (non-fatal): %s", exc)
+        conversation_id = None
+
     # Attach metadata so the frontend can display it
     chart_spec["meta"] = {
-        "filename":      fname,
-        "total_rows":    profile["total_rows"],
-        "total_columns": profile["total_columns"],
-        "columns":       [c["name"] for c in profile["columns"]],
+        "filename":        fname,
+        "total_rows":      profile["total_rows"],
+        "total_columns":   profile["total_columns"],
+        "columns":         [c["name"] for c in profile["columns"]],
+        "conversation_id": conversation_id,
+        "token_usage": {
+            "prompt":     prompt_tokens,
+            "completion": completion_tokens,
+            "total":      prompt_tokens + completion_tokens,
+        },
     }
 
     log.info(
-        "analyze_file  user=%s  charts_returned=%d",
-        user.id[:8], len(chart_spec.get("charts", [])),
+        "analyze_file  user=%s  charts_returned=%d  tokens=%d",
+        user.id[:8], len(chart_spec.get("charts", [])), prompt_tokens + completion_tokens,
     )
     return chart_spec

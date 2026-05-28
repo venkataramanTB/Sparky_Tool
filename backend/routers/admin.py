@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from auth import require_admin
 from config import get_settings
 from database import get_db
-from models import User, RunLog, AuditEvent, AiModel
+from models import User, RunLog, AuditEvent, AiModel, WideEvent, AiConversation, FeatureFlag
 from encrypt import encrypt, decrypt
 from logger import get_logger
 
@@ -102,6 +102,18 @@ def get_stats(user: User = Depends(require_admin), db: Session = Depends(get_db)
         LIMIT 10
     """)).fetchall()
 
+    # ── AI token / cost stats ─────────────────────────────────────────────────
+    total_conversations = db.query(func.count(AiConversation.id)).scalar() or 0
+    total_ai_tokens     = db.query(func.sum(AiConversation.total_tokens)).scalar() or 0
+    total_ai_cost       = db.query(func.sum(AiConversation.estimated_cost_usd)).scalar() or 0
+
+    # ── Observability ────────────────────────────────────────────────────────
+    total_wide_events   = db.query(func.count(WideEvent.id)).scalar() or 0
+    total_feature_flags = db.query(func.count(FeatureFlag.id)).filter(FeatureFlag.status == "active").scalar() or 0
+    enabled_flags       = db.query(func.count(FeatureFlag.id)).filter(
+        FeatureFlag.status == "active", FeatureFlag.enabled == True  # noqa: E712
+    ).scalar() or 0
+
     log.debug("admin stats  users=%d  runs=%d  requested_by=%s", total_users, total_runs, user.id[:8])
 
     return {
@@ -116,6 +128,14 @@ def get_stats(user: User = Depends(require_admin), db: Session = Depends(get_db)
         "total_rows_processed": total_rows,
         "avg_rows_per_run":     round(avg_rows) if avg_rows else 0,
         "failed_by_step":       {row.failed_step: row.cnt for row in step_counts},
+        # ── AI ────────────────────────────────────────────────────────────────
+        "total_conversations":  total_conversations,
+        "total_ai_tokens":      int(total_ai_tokens),
+        "total_ai_cost_usd":    float(total_ai_cost),
+        # ── Observability ─────────────────────────────────────────────────────
+        "total_wide_events":    int(total_wide_events),
+        "total_feature_flags":  int(total_feature_flags),
+        "enabled_feature_flags": int(enabled_flags),
         "runs_per_day": [
             {"day": str(r.day), "count": r.count, "success": r.success, "errors": r.errors}
             for r in runs_per_day

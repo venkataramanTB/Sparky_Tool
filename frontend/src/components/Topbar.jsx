@@ -21,6 +21,7 @@ import ShieldIcon             from '@mui/icons-material/Shield'
 import VerifiedUserIcon       from '@mui/icons-material/VerifiedUser'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import InfoOutlinedIcon       from '@mui/icons-material/InfoOutlined'
+import TuneOutlinedIcon       from '@mui/icons-material/TuneOutlined'
 import { useThemeContext, ACCENT_OPTIONS } from '../ThemeContext'
 import SparkyDog from '../assets/SparkyDog'
 
@@ -300,9 +301,9 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
             <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.62rem', color: 'text.secondary', mt: 0.2 }}>{user?.email}</Typography>
           </Box>
           <Divider sx={{ borderColor: 'divider' }} />
-          <MenuItem sx={{ gap: 1.5, py: 1.1, mx: 0.5, borderRadius: 1 }}>
-            <ListItemIcon sx={{ minWidth: 'auto' }}><AccountCircleIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></ListItemIcon>
-            <ListItemText primary="My profile" primaryTypographyProps={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.73rem', color: 'text.primary' }} />
+          <MenuItem onClick={() => { navigate('preferences'); closeAll() }} sx={{ gap: 1.5, py: 1.1, mx: 0.5, borderRadius: 1 }}>
+            <ListItemIcon sx={{ minWidth: 'auto' }}><TuneOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></ListItemIcon>
+            <ListItemText primary="Preferences" primaryTypographyProps={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.73rem', color: 'text.primary' }} />
           </MenuItem>
           <MenuItem onClick={() => { navigate('settings'); closeAll() }} sx={{ gap: 1.5, py: 1.1, mx: 0.5, borderRadius: 1 }}>
             <ListItemIcon sx={{ minWidth: 'auto' }}><SettingsIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></ListItemIcon>

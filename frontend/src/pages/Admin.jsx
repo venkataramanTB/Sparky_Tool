@@ -42,6 +42,10 @@ import ToggleOnIcon             from '@mui/icons-material/ToggleOn'
 import ToggleOffIcon            from '@mui/icons-material/ToggleOff'
 import LinkIcon                 from '@mui/icons-material/Link'
 import CodeIcon                 from '@mui/icons-material/Code'
+import FlagIcon                 from '@mui/icons-material/Flag'
+import TimelineIcon             from '@mui/icons-material/Timeline'
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
+import FiberManualRecordIcon    from '@mui/icons-material/FiberManualRecord'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as ChartTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
@@ -51,6 +55,10 @@ import {
   listAdminStats, listAdminLogs, listAdminUsers, listAdminRuns,
   inviteAdminUser, setUserRole, updateAdminUser, deleteAdminUser,
   listAiModels, createAiModel, updateAiModel, deleteAiModel, setDefaultAiModel,
+  listWideEvents,
+  listAdminFeatureFlags, createFeatureFlag, updateFeatureFlag,
+  toggleFeatureFlag, deleteFeatureFlag,
+  adminConvStats,
 } from '../api'
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
@@ -353,6 +361,22 @@ export default function Admin() {
   const [curlOpen,       setCurlOpen]       = useState(false)
   const [curlText,       setCurlText]       = useState('')
 
+  // ── Wide Events ───────────────────────────────────────────────────────────
+  const [wideEvents,      setWideEvents]      = useState([])
+  const [wideEventsTotal, setWideEventsTotal] = useState(0)
+  const [wideEventSearch, setWideEventSearch] = useState('')
+  const [wideLoading,     setWideLoading]     = useState(false)
+
+  // ── Feature Flags ─────────────────────────────────────────────────────────
+  const [flags,          setFlags]          = useState([])
+  const [flagDialog,     setFlagDialog]     = useState(false)
+  const [flagForm,       setFlagForm]       = useState({ key: '', name: '', description: '', enabled: false })
+  const [flagLoading,    setFlagLoading]    = useState(false)
+  const [deleteFlagDlg,  setDeleteFlagDlg]  = useState(null) // { id, key }
+
+  // ── AI Usage ──────────────────────────────────────────────────────────────
+  const [aiUsage, setAiUsage] = useState(null)
+
   // per-row role loading
   const [roleLoadingId, setRoleLoadingId] = useState(null)
 
@@ -373,17 +397,32 @@ export default function Admin() {
       listAdminUsers(token, { limit: 200 }),
       listAdminRuns(token,  { limit: 200 }),
       listAiModels(token),
+      listAdminFeatureFlags(token),
+      adminConvStats(token).catch(() => ({ data: null })),
     ])
-      .then(([statsRes, logsRes, usersRes, runsRes, aiRes]) => {
+      .then(([statsRes, logsRes, usersRes, runsRes, aiRes, flagRes, usageRes]) => {
         setStats(statsRes.data)
         setLogs(logsRes.data.items ?? [])
         setUsers(usersRes.data.items ?? [])
         setRuns(runsRes.data.items ?? [])
         setAiModels(aiRes.data.items ?? [])
+        setFlags(flagRes.data.items ?? [])
+        if (usageRes.data) setAiUsage(usageRes.data)
         setError(null)
       })
       .catch((err) => setError(err.response?.data?.detail || 'Unable to load admin data'))
       .finally(() => setLoading(false))
+  }, [token])
+
+  const loadWideEvents = useCallback((q = '') => {
+    if (!token) return
+    setWideLoading(true)
+    const params = { limit: 200 }
+    if (q) params.q = q
+    listWideEvents(token, params)
+      .then((res) => { setWideEvents(res.data.items ?? []); setWideEventsTotal(res.data.total ?? 0) })
+      .catch(() => {})
+      .finally(() => setWideLoading(false))
   }, [token])
 
   useEffect(() => { load() }, [load])
@@ -682,10 +721,10 @@ export default function Admin() {
             <StatCard label="Avg runtime"     value={fmtMs(stats.avg_duration_ms)} Icon={SpeedIcon} />
           </Grid>
           <Grid item xs={6} sm={4} md={2}>
-            <StatCard label="Rows processed"  value={(stats.total_rows_processed ?? 0).toLocaleString()} Icon={StorageIcon} sub={`avg ${(stats.avg_rows_per_run ?? 0).toLocaleString()} / run`} />
+            <StatCard label="AI analyses"     value={(stats.total_conversations ?? 0).toLocaleString()} Icon={SmartToyIcon} sub={`$${(stats.total_ai_cost_usd ?? 0).toFixed(3)} est. cost`} />
           </Grid>
           <Grid item xs={6} sm={4} md={2}>
-            <StatCard label="PS-only runs"    value={stats.sftp_skipped ?? 0} Icon={CloudSyncIcon} accent="#6495b4" sub="SFTP not configured" />
+            <StatCard label="Feature flags"   value={`${stats.enabled_feature_flags ?? 0} / ${stats.total_feature_flags ?? 0}`} Icon={FlagIcon} accent="#c9a84c" sub="enabled / total" />
           </Grid>
         </Grid>
       )}
@@ -703,11 +742,14 @@ export default function Admin() {
           '& .MuiTabs-indicator': { bgcolor: 'primary.main' },
         }}
       >
-        <Tab label={tabLabel('Overview')}            icon={<BarChartIcon sx={{ fontSize: 14 }} />}            iconPosition="start" />
-        <Tab label={tabLabel('Runs', runs.length)}   icon={<CloudSyncIcon sx={{ fontSize: 14 }} />}           iconPosition="start" />
-        <Tab label={tabLabel('Users', users.length)} icon={<GroupIcon sx={{ fontSize: 14 }} />}               iconPosition="start" />
-        <Tab label={tabLabel('Audit Log')}           icon={<AdminPanelSettingsIcon sx={{ fontSize: 14 }} />}  iconPosition="start" />
+        <Tab label={tabLabel('Overview')}              icon={<BarChartIcon sx={{ fontSize: 14 }} />}            iconPosition="start" />
+        <Tab label={tabLabel('Runs', runs.length)}     icon={<CloudSyncIcon sx={{ fontSize: 14 }} />}           iconPosition="start" />
+        <Tab label={tabLabel('Users', users.length)}   icon={<GroupIcon sx={{ fontSize: 14 }} />}               iconPosition="start" />
+        <Tab label={tabLabel('Audit Log')}             icon={<AdminPanelSettingsIcon sx={{ fontSize: 14 }} />}  iconPosition="start" />
         <Tab label={tabLabel('AI Models', aiModels.length)} icon={<SmartToyIcon sx={{ fontSize: 14 }} />} iconPosition="start" />
+        <Tab label={tabLabel('Events', wideEventsTotal || undefined)} icon={<TimelineIcon sx={{ fontSize: 14 }} />} iconPosition="start" onClick={() => { if (wideEvents.length === 0) loadWideEvents() }} />
+        <Tab label={tabLabel('Feature Flags', flags.length)} icon={<FlagIcon sx={{ fontSize: 14 }} />} iconPosition="start" />
+        <Tab label={tabLabel('AI Usage')}             icon={<AccountBalanceWalletIcon sx={{ fontSize: 14 }} />} iconPosition="start" />
       </Tabs>
 
       {/* ═══ TAB 0: OVERVIEW ════════════════════════════════════════════════ */}
@@ -1423,6 +1465,306 @@ export default function Admin() {
               ]}
             />
           </Card>
+        </Box>
+      )}
+
+      {/* ═══ TAB 5: WIDE EVENTS ═════════════════════════════════════════════ */}
+      {tab === 5 && (
+        <Box>
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+            <TextField
+              size="small"
+              placeholder="Search event, endpoint, user…"
+              value={wideEventSearch}
+              onChange={(e) => setWideEventSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && loadWideEvents(wideEventSearch)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: 'text.secondary' }} /></InputAdornment> }}
+              sx={{ minWidth: 260, '& .MuiOutlinedInput-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+            <Button size="small" variant="outlined" startIcon={<RefreshIcon sx={{ fontSize: 15 }} />}
+              onClick={() => loadWideEvents(wideEventSearch)}
+              sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', borderColor: 'divider', color: 'text.secondary' }}
+            >
+              Refresh
+            </Button>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.65rem', color: 'text.disabled', ml: 'auto' }}>
+              {wideEventsTotal.toLocaleString()} total events
+            </Typography>
+          </Box>
+
+          <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+            {wideLoading ? (
+              <Box sx={{ p: 6, display: 'flex', justifyContent: 'center' }}>
+                <CircularProgress size={24} sx={{ color: 'primary.main' }} />
+              </Box>
+            ) : (
+              <DataGrid
+                rows={wideEvents}
+                getRowId={(r) => r.id}
+                autoHeight
+                disableRowSelectionOnClick
+                pageSizeOptions={[25, 50, 100]}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none', borderRadius: 0 }}
+                columns={[
+                  {
+                    field: 'created_at', headerName: 'When', width: 160,
+                    renderCell: (p) => <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif', whiteSpace: 'nowrap' }}>{p.value ? new Date(p.value).toLocaleString() : '—'}</Typography>,
+                  },
+                  {
+                    field: 'event', headerName: 'Event', flex: 1, minWidth: 180,
+                    renderCell: (p) => (
+                      <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'primary.main' }}>
+                        {p.value}
+                      </Typography>
+                    ),
+                  },
+                  {
+                    field: 'status', headerName: 'Status', width: 100,
+                    renderCell: (p) => {
+                      const col = p.value === 'success' ? '#6b8f71' : p.value === 'failed' ? '#b45050' : p.value === 'running' ? accent : 'text.secondary'
+                      return <Chip label={p.value} size="small" sx={{ bgcolor: `${col}18`, color: col, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', height: 19 }} />
+                    },
+                  },
+                  {
+                    field: 'tier', headerName: 'Tier', width: 60,
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', color: 'text.disabled' }}>T{p.value}</Typography>,
+                  },
+                  {
+                    field: 'http_method', headerName: 'Method', width: 80,
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>{p.value || '—'}</Typography>,
+                  },
+                  {
+                    field: 'http_status', headerName: 'HTTP', width: 70,
+                    renderCell: (p) => {
+                      const col = !p.value ? 'text.disabled' : p.value < 300 ? '#6b8f71' : p.value < 400 ? accent : '#b45050'
+                      return <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: col }}>{p.value || '—'}</Typography>
+                    },
+                  },
+                  {
+                    field: 'endpoint', headerName: 'Endpoint', flex: 1, minWidth: 180,
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.65rem', color: 'text.disabled', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.value || '—'}</Typography>,
+                  },
+                  {
+                    field: 'user_name', headerName: 'User', width: 140,
+                    renderCell: (p) => <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{p.value || p.row.user_id?.slice(0, 12) || '—'}</Typography>,
+                  },
+                  {
+                    field: 'total_duration_ms', headerName: 'Duration', width: 100,
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>{p.value != null ? fmtMs(p.value) : '—'}</Typography>,
+                  },
+                ]}
+              />
+            )}
+          </Card>
+        </Box>
+      )}
+
+      {/* ═══ TAB 6: FEATURE FLAGS ════════════════════════════════════════════ */}
+      {tab === 6 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+              onClick={() => { setFlagForm({ key: '', name: '', description: '', enabled: false }); setFlagDialog(true) }}
+              sx={{ bgcolor: 'primary.main', color: 'background.default', fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em', px: 2.5, py: 0.9, borderRadius: '1px', boxShadow: `0 2px 12px ${accent}30` }}
+            >
+              New Flag
+            </Button>
+          </Box>
+
+          <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+            <DataGrid
+              rows={flags}
+              getRowId={(r) => r.id}
+              autoHeight
+              disableRowSelectionOnClick
+              pageSizeOptions={[25, 50]}
+              initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+              sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none', borderRadius: 0 }}
+              columns={[
+                {
+                  field: 'key', headerName: 'Key', flex: 1, minWidth: 180,
+                  renderCell: (p) => (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      <FlagIcon sx={{ fontSize: 13, color: p.row.enabled ? '#6b8f71' : 'text.disabled' }} />
+                      <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.primary' }}>{p.value}</Typography>
+                    </Box>
+                  ),
+                },
+                { field: 'name', headerName: 'Name', flex: 1, minWidth: 150, renderCell: (p) => <Typography sx={{ fontSize: '0.74rem', fontFamily: '"Raleway", sans-serif', color: 'text.secondary' }}>{p.value || '—'}</Typography> },
+                {
+                  field: 'enabled', headerName: 'Enabled', width: 110,
+                  renderCell: (p) => (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <FiberManualRecordIcon sx={{ fontSize: 10, color: p.value ? '#6b8f71' : 'text.disabled' }} />
+                      <Typography sx={{ fontSize: '0.7rem', fontFamily: '"Raleway", sans-serif', color: p.value ? '#6b8f71' : 'text.disabled' }}>
+                        {p.value ? 'enabled' : 'disabled'}
+                      </Typography>
+                    </Box>
+                  ),
+                },
+                { field: 'status', headerName: 'Status', width: 100, renderCell: (p) => <Chip label={p.value} size="small" sx={{ height: 19, fontSize: '0.58rem', fontFamily: '"JetBrains Mono", monospace', bgcolor: p.value === 'active' ? 'rgba(107,143,113,0.12)' : 'rgba(128,128,128,0.1)', color: p.value === 'active' ? '#6b8f71' : 'text.secondary' }} /> },
+                { field: 'description', headerName: 'Description', flex: 2, minWidth: 180, renderCell: (p) => <Typography sx={{ fontSize: '0.7rem', color: 'text.disabled', fontFamily: '"Raleway", sans-serif' }}>{p.value || '—'}</Typography> },
+                {
+                  field: 'actions', headerName: 'Actions', width: 120, sortable: false,
+                  renderCell: (p) => (
+                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                      <Tooltip title={p.row.enabled ? 'Disable' : 'Enable'}>
+                        <IconButton size="small" onClick={() => {
+                          toggleFeatureFlag(p.row.id, token)
+                            .then((r) => setFlags((prev) => prev.map((f) => f.id === r.data.id ? r.data : f)))
+                            .catch(() => {})
+                        }} sx={{ color: p.row.enabled ? '#6b8f71' : 'text.disabled', '&:hover': { color: p.row.enabled ? '#b45050' : '#6b8f71' } }}>
+                          {p.row.enabled ? <ToggleOnIcon sx={{ fontSize: 20 }} /> : <ToggleOffIcon sx={{ fontSize: 20 }} />}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton size="small" onClick={() => setDeleteFlagDlg({ id: p.row.id, key: p.row.key })} sx={{ color: 'text.secondary', '&:hover': { color: '#c98f8f' } }}>
+                          <DeleteIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  ),
+                },
+              ]}
+            />
+          </Card>
+
+          {/* Create flag dialog */}
+          <Dialog open={flagDialog} onClose={() => setFlagDialog(false)} maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.4rem', color: 'text.primary', pb: 1 }}>New Feature Flag</DialogTitle>
+            <DialogContent>
+              <Box sx={{ display: 'grid', gap: 2, mt: 1 }}>
+                <TextField label="Key *" size="small" fullWidth autoFocus placeholder="e.g. enable_new_dashboard" value={flagForm.key} onChange={(e) => setFlagForm((p) => ({ ...p, key: e.target.value }))} sx={{ '& .MuiInputBase-root': { fontFamily: '"JetBrains Mono", monospace', fontSize: '0.82rem' } }} />
+                <TextField label="Display name" size="small" fullWidth value={flagForm.name} onChange={(e) => setFlagForm((p) => ({ ...p, name: e.target.value }))} sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }} />
+                <TextField label="Description" size="small" fullWidth multiline rows={2} value={flagForm.description} onChange={(e) => setFlagForm((p) => ({ ...p, description: e.target.value }))} sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }} />
+                <FormControlLabel control={<Switch size="small" checked={flagForm.enabled} onChange={(e) => setFlagForm((p) => ({ ...p, enabled: e.target.checked }))} />} label={<Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem' }}>Start enabled</Typography>} />
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+              <Button onClick={() => setFlagDialog(false)} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  if (!flagForm.key.trim()) return
+                  setFlagLoading(true)
+                  createFeatureFlag(flagForm, token)
+                    .then((r) => { setFlags((p) => [...p, r.data]); setFlagDialog(false) })
+                    .catch((e) => setError(e.response?.data?.detail || 'Failed to create flag'))
+                    .finally(() => setFlagLoading(false))
+                }}
+                disabled={flagLoading || !flagForm.key.trim()}
+                variant="contained"
+                startIcon={flagLoading ? <CircularProgress size={14} /> : <SaveIcon sx={{ fontSize: 15 }} />}
+                sx={{ bgcolor: 'primary.main', color: 'background.default', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}
+              >
+                {flagLoading ? 'Creating…' : 'Create'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Delete flag dialog */}
+          <Dialog open={Boolean(deleteFlagDlg)} onClose={() => setDeleteFlagDlg(null)} maxWidth="xs" fullWidth>
+            <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.3rem', color: 'text.primary', pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <WarningAmberIcon sx={{ fontSize: 20, color: '#b45050' }} /> Delete flag?
+            </DialogTitle>
+            <DialogContent>
+              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', color: 'text.secondary', lineHeight: 1.7 }}>
+                Permanently delete <strong style={{ color: theme.palette.text.primary, fontFamily: 'monospace' }}>{deleteFlagDlg?.key}</strong>. Any code checking this flag will treat it as disabled.
+              </Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+              <Button onClick={() => setDeleteFlagDlg(null)} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  setFlagLoading(true)
+                  deleteFeatureFlag(deleteFlagDlg.id, token)
+                    .then(() => { setFlags((p) => p.filter((f) => f.id !== deleteFlagDlg.id)); setDeleteFlagDlg(null) })
+                    .catch((e) => setError(e.response?.data?.detail || 'Failed to delete flag'))
+                    .finally(() => setFlagLoading(false))
+                }}
+                disabled={flagLoading}
+                variant="contained"
+                startIcon={flagLoading ? <CircularProgress size={14} /> : <DeleteIcon sx={{ fontSize: 15 }} />}
+                sx={{ bgcolor: '#8f4a4a', '&:hover': { bgcolor: '#b45050' }, fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}
+              >
+                {flagLoading ? 'Deleting…' : 'Delete'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </Box>
+      )}
+
+      {/* ═══ TAB 7: AI USAGE ════════════════════════════════════════════════ */}
+      {tab === 7 && (
+        <Box>
+          {aiUsage ? (
+            <Box sx={{ display: 'grid', gap: 3 }}>
+              {/* KPI row */}
+              <Grid container spacing={2}>
+                {[
+                  { label: 'Conversations', value: (aiUsage.total_conversations ?? 0).toLocaleString(), Icon: SmartToyIcon },
+                  { label: 'Total tokens',  value: (aiUsage.total_tokens ?? 0).toLocaleString(),       Icon: CodeIcon },
+                  { label: 'Estimated cost', value: `$${(aiUsage.total_cost_usd ?? 0).toFixed(4)}`,    Icon: AccountBalanceWalletIcon, accent: '#c9a84c' },
+                ].map(({ label, value, Icon, accent: a }) => (
+                  <Grid item xs={12} sm={4} key={label}>
+                    <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+                      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                          <Box>
+                            <Typography sx={{ fontSize: '0.58rem', letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.secondary', mb: 0.75 }}>{label}</Typography>
+                            <Typography sx={{ fontSize: '1.8rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>{value}</Typography>
+                          </Box>
+                          <Icon sx={{ fontSize: 22, color: a || 'primary.main', opacity: 0.7, mt: 0.5 }} />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+
+              {/* Per-provider breakdown */}
+              {aiUsage.by_provider?.length > 0 && (
+                <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+                  <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+                    <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.secondary', mb: 2 }}>
+                      Usage by provider
+                    </Typography>
+                    <DataGrid
+                      rows={aiUsage.by_provider}
+                      getRowId={(r) => r.provider}
+                      autoHeight
+                      hideFooter
+                      disableRowSelectionOnClick
+                      sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none' }}
+                      columns={[
+                        {
+                          field: 'provider', headerName: 'Provider', width: 130,
+                          renderCell: (p) => {
+                            const colors = { gemini: '#4285f4', openai: '#10a37f', anthropic: '#d4a84b', grok: '#1da1f2', generic: '#888' }
+                            const col = colors[p.value] || '#888'
+                            return <Chip label={p.value} size="small" sx={{ bgcolor: `${col}18`, color: col, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.6rem', height: 20 }} />
+                          },
+                        },
+                        { field: 'conversations',     headerName: 'Conversations',   width: 130, type: 'number', renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.secondary' }}>{(p.value ?? 0).toLocaleString()}</Typography> },
+                        { field: 'prompt_tokens',     headerName: 'Prompt tokens',   flex: 1,   type: 'number', renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.secondary' }}>{(p.value ?? 0).toLocaleString()}</Typography> },
+                        { field: 'completion_tokens', headerName: 'Completion tok.',  flex: 1,   type: 'number', renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.secondary' }}>{(p.value ?? 0).toLocaleString()}</Typography> },
+                        { field: 'total_tokens',      headerName: 'Total tokens',    flex: 1,   type: 'number', renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.primary', fontWeight: 600 }}>{(p.value ?? 0).toLocaleString()}</Typography> },
+                        { field: 'cost_usd',          headerName: 'Est. cost (USD)', width: 140, type: 'number', renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: '#c9a84c' }}>${(p.value ?? 0).toFixed(4)}</Typography> },
+                      ]}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ py: 8, textAlign: 'center' }}>
+              <Typography sx={{ color: 'text.disabled', fontFamily: '"Raleway", sans-serif', fontSize: '0.85rem' }}>
+                No AI usage data yet. Run a file analysis to start tracking.
+              </Typography>
+            </Box>
+          )}
         </Box>
       )}
 

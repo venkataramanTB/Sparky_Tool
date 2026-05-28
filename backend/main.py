@@ -1,6 +1,10 @@
+import asyncio as _asyncio
+import base64 as _base64
 import httpx
+import json as _json_mod
 import os as _os
 import time as _time
+import uuid as _uuid
 import paramiko
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -41,21 +45,117 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     t0 = _time.time()
+    request_id = str(_uuid.uuid4())
     response = await call_next(request)
     elapsed = round((_time.time() - t0) * 1000)
-    # Skip noisy static-asset requests from the log
     path = request.url.path
+
     if not path.startswith("/assets/") and path not in ("/favicon.ico",):
         log.info("%-6s %-55s %3d  %d ms", request.method, path, response.status_code, elapsed)
+
+    # Emit wide event for all v2 API calls (fire-and-forget)
+    if _v2_enabled and path.startswith("/api/v2/"):
+        auth_header = request.headers.get("Authorization", "")
+        user_id = None
+        if auth_header.startswith("Bearer "):
+            user_id = _decode_jwt_sub(auth_header[7:])
+        _asyncio.create_task(_emit_wide_event(
+            path, request.method, response.status_code, elapsed, user_id, request_id,
+        ))
+
     return response
 
 
 _cache: dict = {}
 _v2_enabled = False
 
+# ── Wide-event middleware helpers ─────────────────────────────────────────────
+
+def _decode_jwt_sub(token: str) -> str | None:
+    """Extract the 'sub' claim from a JWT without verifying the signature (observability only)."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        padding = "=" * (-len(parts[1]) % 4)
+        payload = _json_mod.loads(_base64.urlsafe_b64decode(parts[1] + padding))
+        return payload.get("sub")
+    except Exception:
+        return None
+
+
+_PATH_EVENT_MAP: list[tuple[str, str, str]] = [
+    # (method, path-prefix-or-exact, event-name)
+    ("POST",   "/api/v2/run/",                   "run.started"),
+    ("POST",   "/api/v2/admin/users/invite",      "user.invited"),
+    ("PUT",    "/api/v2/admin/users/",            "user.role_changed"),
+    ("PATCH",  "/api/v2/admin/users/",            "user.updated"),
+    ("DELETE", "/api/v2/admin/users/",            "user.deleted"),
+    ("POST",   "/api/v2/admin/ai-models",         "ai_model.created"),
+    ("PUT",    "/api/v2/admin/ai-models/",        "ai_model.updated"),
+    ("DELETE", "/api/v2/admin/ai-models/",        "ai_model.deleted"),
+    ("POST",   "/api/v2/admin/feature-flags",     "feature_flag.created"),
+    ("PATCH",  "/api/v2/admin/feature-flags/",    "feature_flag.updated"),
+    ("POST",   "/api/v2/admin/feature-flags/",    "feature_flag.toggled"),
+    ("DELETE", "/api/v2/admin/feature-flags/",    "feature_flag.deleted"),
+    ("POST",   "/api/v2/configs/",                "config.created"),
+    ("PUT",    "/api/v2/configs/",                "config.updated"),
+    ("DELETE", "/api/v2/configs/",                "config.deleted"),
+    ("PUT",    "/api/v2/preferences",             "preferences.updated"),
+    ("POST",   "/api/v2/insights/analyze-file",   "ai_analysis.completed"),
+    ("GET",    "/api/v2/admin/stats",             "admin.stats.handled"),
+    ("GET",    "/api/v2/admin/events/stream",     "admin.events.stream.handled"),
+    ("GET",    "/api/v2/admin/events",            "admin.events.handled"),
+    ("GET",    "/api/v2/users/me",                "users.me.handled"),
+    ("GET",    "/api/v2/feature-flags",           "feature_flags.handled"),
+    ("GET",    "/api/health",                     "health.checked"),
+]
+
+
+def _path_to_event(method: str, path: str) -> str:
+    for m, prefix, event in _PATH_EVENT_MAP:
+        if method.upper() == m and path.startswith(prefix):
+            return event
+    return "api.request"
+
+
+async def _emit_wide_event(
+    path: str, method: str, http_status: int, duration_ms: int,
+    user_id: str | None, request_id: str,
+) -> None:
+    """Fire-and-forget wide event writer using a background thread to avoid blocking."""
+    event_name = _path_to_event(method, path)
+    # Skip T4 events (health, me, flags list) — they're too noisy
+    from routers.wide_events import get_event_tier, _should_write
+    tier = get_event_tier(event_name)
+    if not _should_write(tier):
+        return
+
+    try:
+        from database import get_db as _get_db
+        db = next(_get_db())
+        from routers.wide_events import write_wide_event
+        write_wide_event(
+            db,
+            event=event_name,
+            status="success" if http_status < 400 else "failed",
+            http_method=method,
+            http_status=http_status,
+            endpoint=path,
+            user_id=user_id,
+            duration_ms=duration_ms,
+            request_id=request_id,
+        )
+        db.close()
+    except Exception:
+        pass  # wide events are best-effort, never crash the request
+
+
 # ── v2 routers ────────────────────────────────────────────────────────────────
 try:
     from routers import users as _u, configs as _c, runs as _r, admin as _a, insights as _i
+    from routers import wide_events as _we, preferences as _pref, feature_flags as _ff
+    from routers import conversations as _conv
     from database import get_db
     from models import UserConfig, RunLog, AuditEvent
     from auth import get_current_user
@@ -66,6 +166,10 @@ try:
     app.include_router(_r.router)
     app.include_router(_a.router)
     app.include_router(_i.router)
+    app.include_router(_we.router)
+    app.include_router(_pref.router)
+    app.include_router(_ff.router)
+    app.include_router(_conv.router)
     _v2_enabled = True
 
     def _config_to_ns(config: UserConfig) -> SimpleNamespace:

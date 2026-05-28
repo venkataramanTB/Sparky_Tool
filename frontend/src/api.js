@@ -101,3 +101,38 @@ export const createAiModel     = (payload, token)       => client.post('/v2/admi
 export const updateAiModel     = (id, payload, token)   => client.put(`/v2/admin/ai-models/${id}`,    payload,  { headers: auth(token) })
 export const deleteAiModel     = (id, token)            => client.delete(`/v2/admin/ai-models/${id}`,           { headers: auth(token) })
 export const setDefaultAiModel = (id, token)            => client.post(`/v2/admin/ai-models/${id}/set-default`, null, { headers: auth(token) })
+
+// Wide Events admin (v2)
+export const listWideEvents     = (token, params = {})  => client.get('/v2/admin/events',  { headers: auth(token), params })
+export const listWideEventViews = (token)               => client.get('/v2/admin/events/views', { headers: auth(token) })
+export const createWideEventView = (payload, token)     => client.post('/v2/admin/events/views', payload, { headers: auth(token) })
+export const updateWideEventView = (id, payload, token) => client.put(`/v2/admin/events/views/${id}`, payload, { headers: auth(token) })
+export const deleteWideEventView = (id, token)          => client.delete(`/v2/admin/events/views/${id}`, { headers: auth(token) })
+
+// SSE stream — returns an EventSource (caller manages lifecycle)
+export function openWideEventStream(token, params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+  const url  = `${base}/api/v2/admin/events/stream${qs ? '?' + qs : ''}`
+  // EventSource doesn't support custom headers; pass token as query param
+  return new EventSource(`${url}${qs ? '&' : '?'}access_token=${token}`)
+}
+
+// User Preferences (v2)
+export const getPreferences    = (token)          => client.get('/v2/preferences',  { headers: auth(token) })
+export const updatePreferences = (payload, token) => client.put('/v2/preferences', payload, { headers: auth(token) })
+
+// Feature Flags (v2)
+export const listFeatureFlags       = (token)            => client.get('/v2/feature-flags',                     { headers: auth(token) })
+export const listAdminFeatureFlags  = (token)            => client.get('/v2/admin/feature-flags',               { headers: auth(token) })
+export const createFeatureFlag      = (payload, token)   => client.post('/v2/admin/feature-flags',    payload,  { headers: auth(token) })
+export const updateFeatureFlag      = (id, payload, token) => client.patch(`/v2/admin/feature-flags/${id}`, payload, { headers: auth(token) })
+export const toggleFeatureFlag      = (id, token)        => client.post(`/v2/admin/feature-flags/${id}/toggle`, null, { headers: auth(token) })
+export const deleteFeatureFlag      = (id, token)        => client.delete(`/v2/admin/feature-flags/${id}`,     { headers: auth(token) })
+
+// AI Conversations (v2)
+export const listConversations  = (token, params = {}) => client.get('/v2/conversations',             { headers: auth(token), params })
+export const getConversation    = (id, token)          => client.get(`/v2/conversations/${id}`,       { headers: auth(token) })
+export const deleteConversation = (id, token)          => client.delete(`/v2/conversations/${id}`,    { headers: auth(token) })
+export const adminConvStats     = (token)              => client.get('/v2/conversations/admin/stats', { headers: auth(token) })
+export const adminListConvs     = (token, params = {}) => client.get('/v2/conversations/admin/all',   { headers: auth(token), params })

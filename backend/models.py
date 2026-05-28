@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, Text, TIMESTAMP, JSON, ForeignKey, Index
+from sqlalchemy import Column, String, Integer, Boolean, Text, TIMESTAMP, JSON, ForeignKey, Index, Numeric
 from sqlalchemy.orm import declarative_base
 from datetime import datetime, timezone
 
@@ -113,3 +113,116 @@ class AiModel(Base):
     is_active   = Column(Boolean, default=True)
     created_at  = Column(TIMESTAMP(timezone=True), default=_now)
     updated_at  = Column(TIMESTAMP(timezone=True), default=_now)
+
+
+# ── Wide Events (structured observability) ────────────────────────────────────
+
+class WideEvent(Base):
+    """One row per significant API operation. Status is always explicit. Tier controls retention/sampling."""
+    __tablename__ = "wide_events"
+    __table_args__ = (
+        Index("idx_wide_events_created", "created_at"),
+        Index("idx_wide_events_event", "event"),
+        Index("idx_wide_events_status", "status"),
+        Index("idx_wide_events_tier", "tier"),
+        Index("idx_wide_events_user_id", "user_id"),
+        Index("idx_wide_events_request_id", "request_id"),
+    )
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    event_uuid       = Column(String(36), nullable=False)   # logical UUID assigned at creation
+    event            = Column(String(200), nullable=False)
+    status           = Column(String(20), nullable=False, default="success")
+    tier             = Column(Integer, nullable=False, default=4)
+    message          = Column(Text)
+    total_duration_ms = Column(Integer)
+    http_method      = Column(String(10))
+    http_status      = Column(Integer)
+    endpoint         = Column(Text)
+    user_id          = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
+    user_name        = Column(String(255))
+    request_id       = Column(String(100))
+    process_id       = Column(String(100))
+    environment      = Column(String(50), default="production")
+    payload          = Column(JSON, default=dict)
+    created_at       = Column(TIMESTAMP(timezone=True), default=_now)
+
+
+class WideEventView(Base):
+    """Saved admin filter presets for the event stream."""
+    __tablename__ = "wide_event_views"
+    __table_args__ = (Index("idx_wide_event_views_name", "name"),)
+    id          = Column(String(36), primary_key=True)   # UUID
+    name        = Column(Text, nullable=False)
+    description = Column(Text)
+    config      = Column(JSON, default=dict)             # filter params serialized as JSON
+    created_by  = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
+    updated_by  = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
+    created_at  = Column(TIMESTAMP(timezone=True), default=_now)
+    updated_at  = Column(TIMESTAMP(timezone=True), default=_now)
+
+
+# ── User Preferences ──────────────────────────────────────────────────────────
+
+class UserPreference(Base):
+    """Per-user UI settings stored as a JSON blob. One row per user."""
+    __tablename__ = "user_preferences"
+    user_id     = Column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    preferences = Column(JSON, default=dict)
+    updated_at  = Column(TIMESTAMP(timezone=True), default=_now)
+
+
+# ── Feature Flags ─────────────────────────────────────────────────────────────
+
+class FeatureFlag(Base):
+    """Runtime on/off toggles. Admins flip them in the console without a redeploy."""
+    __tablename__ = "feature_flags"
+    __table_args__ = (Index("idx_feature_flags_key", "key"),)
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    key         = Column(String(200), unique=True, nullable=False)
+    name        = Column(String(200))
+    description = Column(Text)
+    enabled     = Column(Boolean, default=False)
+    status      = Column(String(20), default="active")   # active | archived
+    created_by  = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
+    created_at  = Column(TIMESTAMP(timezone=True), default=_now)
+    updated_at  = Column(TIMESTAMP(timezone=True), default=_now)
+
+
+# ── AI Conversations + Messages ───────────────────────────────────────────────
+
+class AiConversation(Base):
+    """Tracks every AI file-analysis session: model used, aggregate token counts, cost."""
+    __tablename__ = "ai_conversations"
+    __table_args__ = (Index("idx_ai_conv_user_id", "user_id"),)
+    id                       = Column(Integer, primary_key=True, autoincrement=True)
+    user_id                  = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title                    = Column(String(500))
+    ai_model_db_id           = Column(Integer, ForeignKey("ai_models.id", ondelete="SET NULL"))
+    provider                 = Column(String(50))
+    model_id_str             = Column(String(255))
+    total_prompt_tokens      = Column(Integer, default=0)
+    total_completion_tokens  = Column(Integer, default=0)
+    total_reasoning_tokens   = Column(Integer, default=0)
+    total_cached_tokens      = Column(Integer, default=0)
+    total_tokens             = Column(Integer, default=0)
+    estimated_cost_usd       = Column(Numeric(10, 6))
+    created_at               = Column(TIMESTAMP(timezone=True), default=_now)
+    updated_at               = Column(TIMESTAMP(timezone=True), default=_now)
+
+
+class AiMessage(Base):
+    """One row per turn (user prompt or assistant reply) within an AiConversation."""
+    __tablename__ = "ai_messages"
+    __table_args__ = (Index("idx_ai_msg_conv_id", "conversation_id"),)
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    conversation_id     = Column(Integer, ForeignKey("ai_conversations.id", ondelete="CASCADE"), nullable=False)
+    user_id             = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role                = Column(String(20), nullable=False)   # user | assistant
+    content             = Column(Text)
+    prompt_tokens       = Column(Integer, default=0)
+    completion_tokens   = Column(Integer, default=0)
+    reasoning_tokens    = Column(Integer, default=0)
+    cached_tokens       = Column(Integer, default=0)
+    total_tokens        = Column(Integer, default=0)
+    ttft_ms             = Column(Integer)   # time-to-first-token (ms) when available
+    created_at          = Column(TIMESTAMP(timezone=True), default=_now)
