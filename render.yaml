@@ -7,17 +7,13 @@
 services:
   - type: web
     name: sparky-tool-backend
-    runtime: python
-    # Build and start commands run relative to rootDir
-    rootDir: backend
-    # Install VPN clients before Python deps so they are available at runtime.
-    # openfortivpn = Fortinet FortiGate SSL VPN
-    # openconnect  = Cisco AnyConnect / GlobalProtect / Pulse Secure
-    # openvpn / wireguard-tools / openssh-client = other VPN types
-    buildCommand: apt-get update && apt-get install -y --no-install-recommends openfortivpn openconnect openvpn wireguard-tools openssh-client && pip install -r requirements.txt
-    # Render injects PORT; uvicorn must bind 0.0.0.0 so the reverse proxy can reach it
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    # Keep one instance alive (free tier: spins down after 15 min of inactivity)
+    # Docker runtime gives a writable filesystem during build so apt-get works.
+    # The native Python runtime has a read-only FS that blocks apt-get.
+    runtime: docker
+    # Dockerfile lives in backend/ but needs the repo root as context so it can
+    # reach both frontend/ (Node build) and backend/ (Python app).
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
     plan: free
 
     envVars:
