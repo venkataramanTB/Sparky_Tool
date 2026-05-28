@@ -33,6 +33,14 @@ import SaveIcon                  from '@mui/icons-material/Save'
 import CancelIcon                from '@mui/icons-material/Cancel'
 import SendIcon                  from '@mui/icons-material/Send'
 import WarningAmberIcon          from '@mui/icons-material/WarningAmber'
+import SmartToyIcon             from '@mui/icons-material/SmartToy'
+import AddIcon                  from '@mui/icons-material/Add'
+import KeyIcon                  from '@mui/icons-material/Key'
+import StarIcon                 from '@mui/icons-material/Star'
+import StarOutlineIcon          from '@mui/icons-material/StarOutline'
+import ToggleOnIcon             from '@mui/icons-material/ToggleOn'
+import ToggleOffIcon            from '@mui/icons-material/ToggleOff'
+import LinkIcon                 from '@mui/icons-material/Link'
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as ChartTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,
@@ -41,6 +49,7 @@ import { useAuth } from '../AuthContext'
 import {
   listAdminStats, listAdminLogs, listAdminUsers, listAdminRuns,
   inviteAdminUser, setUserRole, updateAdminUser, deleteAdminUser,
+  listAiModels, createAiModel, updateAiModel, deleteAiModel, setDefaultAiModel,
 } from '../api'
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
@@ -333,6 +342,14 @@ export default function Admin() {
 
   const saveView = (key, setter) => (v) => { setter(v); localStorage.setItem(key, v) }
 
+  const [aiModels,      setAiModels]      = useState([])
+  const [aiModelDialog, setAiModelDialog] = useState(null) // null | 'add' | model-object
+  const [aiModelForm,   setAiModelForm]   = useState({
+    name: '', provider: 'gemini', model_id: '', api_key: '', base_url: '', is_default: false, is_active: true,
+  })
+  const [aiModelLoading, setAiModelLoading] = useState(false)
+  const [deleteAiDialog, setDeleteAiDialog] = useState(null) // null | { id, name }
+
   // per-row role loading
   const [roleLoadingId, setRoleLoadingId] = useState(null)
 
@@ -352,12 +369,14 @@ export default function Admin() {
       listAdminLogs(token,  { limit: 200 }),
       listAdminUsers(token, { limit: 200 }),
       listAdminRuns(token,  { limit: 200 }),
+      listAiModels(token),
     ])
-      .then(([statsRes, logsRes, usersRes, runsRes]) => {
+      .then(([statsRes, logsRes, usersRes, runsRes, aiRes]) => {
         setStats(statsRes.data)
         setLogs(logsRes.data.items ?? [])
         setUsers(usersRes.data.items ?? [])
         setRuns(runsRes.data.items ?? [])
+        setAiModels(aiRes.data.items ?? [])
         setError(null)
       })
       .catch((err) => setError(err.response?.data?.detail || 'Unable to load admin data'))
@@ -441,6 +460,61 @@ export default function Admin() {
       const exists = prev.some((u) => u.id === newUser.id)
       return exists ? prev.map((u) => u.id === newUser.id ? newUser : u) : [newUser, ...prev]
     })
+  }
+
+  // ── AI model actions ──────────────────────────────────────────────────────
+
+  const openAddModel = () => {
+    setAiModelForm({ name: '', provider: 'gemini', model_id: '', api_key: '', base_url: '', is_default: false, is_active: true })
+    setAiModelDialog('add')
+  }
+
+  const openEditModel = (m) => {
+    setAiModelForm({ name: m.name, provider: m.provider, model_id: m.model_id, api_key: '', base_url: m.base_url, is_default: m.is_default, is_active: m.is_active })
+    setAiModelDialog(m)
+  }
+
+  const handleSaveAiModel = async () => {
+    setAiModelLoading(true)
+    try {
+      if (aiModelDialog === 'add') {
+        const res = await createAiModel(aiModelForm, token)
+        setAiModels((prev) => [...prev, res.data])
+      } else {
+        const payload = { ...aiModelForm }
+        if (!payload.api_key) delete payload.api_key
+        const res = await updateAiModel(aiModelDialog.id, payload, token)
+        setAiModels((prev) => prev.map((m) => m.id === res.data.id ? res.data : m))
+      }
+      setAiModelDialog(null)
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to save model')
+    } finally {
+      setAiModelLoading(false)
+    }
+  }
+
+  const handleDeleteAiModel = async () => {
+    if (!deleteAiDialog) return
+    setAiModelLoading(true)
+    try {
+      await deleteAiModel(deleteAiDialog.id, token)
+      setAiModels((prev) => prev.filter((m) => m.id !== deleteAiDialog.id))
+      setDeleteAiDialog(null)
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to delete model')
+    } finally {
+      setAiModelLoading(false)
+    }
+  }
+
+  const handleSetDefault = async (id) => {
+    try {
+      const res = await setDefaultAiModel(id, token)
+      setAiModels((prev) => prev.map((m) => ({ ...m, is_default: m.id === res.data.id })))
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to set default')
+    }
   }
 
   // ── guards ────────────────────────────────────────────────────────────────
@@ -584,6 +658,7 @@ export default function Admin() {
         <Tab label={tabLabel('Runs', runs.length)}   icon={<CloudSyncIcon sx={{ fontSize: 14 }} />}           iconPosition="start" />
         <Tab label={tabLabel('Users', users.length)} icon={<GroupIcon sx={{ fontSize: 14 }} />}               iconPosition="start" />
         <Tab label={tabLabel('Audit Log')}           icon={<AdminPanelSettingsIcon sx={{ fontSize: 14 }} />}  iconPosition="start" />
+        <Tab label={tabLabel('AI Models', aiModels.length)} icon={<SmartToyIcon sx={{ fontSize: 14 }} />} iconPosition="start" />
       </Tabs>
 
       {/* ═══ TAB 0: OVERVIEW ════════════════════════════════════════════════ */}
@@ -1170,6 +1245,138 @@ export default function Admin() {
         </Box>
       )}
 
+      {/* ═══ TAB 4: AI MODELS ══════════════════════════════════════════════ */}
+      {tab === 4 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+              onClick={openAddModel}
+              sx={{
+                bgcolor: 'primary.main', color: 'background.default',
+                fontFamily: '"Raleway", sans-serif', fontWeight: 700,
+                fontSize: '0.7rem', letterSpacing: '0.1em',
+                px: 2.5, py: 0.9, borderRadius: '1px',
+                boxShadow: `0 2px 12px ${accent}30`,
+                '&:hover': { bgcolor: 'primary.light' },
+              }}
+            >
+              Add Model
+            </Button>
+          </Box>
+
+          <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+            <DataGrid
+              rows={aiModels}
+              getRowId={(r) => r.id}
+              autoHeight
+              disableRowSelectionOnClick
+              pageSizeOptions={[25, 50]}
+              initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+              sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none', borderRadius: 0 }}
+              columns={[
+                {
+                  field: 'name', headerName: 'Name', flex: 1, minWidth: 160,
+                  renderCell: (p) => (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      <SmartToyIcon sx={{ fontSize: 14, color: 'primary.main', opacity: 0.7 }} />
+                      <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.primary' }}>
+                        {p.value}
+                      </Typography>
+                      {p.row.is_default && (
+                        <Chip label="default" size="small" sx={{ height: 16, fontSize: '0.52rem', bgcolor: `${accent}20`, color: 'primary.main', px: 0 }} />
+                      )}
+                    </Box>
+                  ),
+                },
+                {
+                  field: 'provider', headerName: 'Provider', width: 110,
+                  renderCell: (p) => {
+                    const colors = { gemini: '#4285f4', openai: '#10a37f', anthropic: '#d4a84b', grok: '#1da1f2', generic: '#888' }
+                    const col = colors[p.value] || '#888'
+                    return (
+                      <Chip
+                        label={p.value}
+                        size="small"
+                        sx={{ bgcolor: `${col}18`, color: col, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.6rem', height: 20 }}
+                      />
+                    )
+                  },
+                },
+                {
+                  field: 'model_id', headerName: 'Model ID', flex: 1, minWidth: 160,
+                  renderCell: (p) => (
+                    <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', color: 'text.secondary' }}>
+                      {p.value}
+                    </Typography>
+                  ),
+                },
+                {
+                  field: 'api_key', headerName: 'API Key', width: 130,
+                  renderCell: (p) => (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <KeyIcon sx={{ fontSize: 12, color: p.value ? 'text.disabled' : '#b45050' }} />
+                      <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: p.value ? 'text.disabled' : '#b45050' }}>
+                        {p.value || 'not set'}
+                      </Typography>
+                    </Box>
+                  ),
+                },
+                {
+                  field: 'base_url', headerName: 'Base URL', flex: 1, minWidth: 130,
+                  renderCell: (p) => p.value
+                    ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <LinkIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
+                        <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.66rem', color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.value}
+                        </Typography>
+                      </Box>
+                    )
+                    : <Typography sx={{ fontSize: '0.68rem', color: 'text.disabled' }}>—</Typography>,
+                },
+                {
+                  field: 'is_active', headerName: 'Active', width: 80,
+                  renderCell: (p) => p.value
+                    ? <ToggleOnIcon  sx={{ fontSize: 22, color: '#6b8f71' }} />
+                    : <ToggleOffIcon sx={{ fontSize: 22, color: 'text.disabled' }} />,
+                },
+                {
+                  field: 'actions', headerName: 'Actions', width: 130, sortable: false,
+                  renderCell: (p) => (
+                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                      <Tooltip title={p.row.is_default ? 'Already default' : 'Set as default'}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleSetDefault(p.row.id)}
+                            disabled={p.row.is_default}
+                            sx={{ color: p.row.is_default ? accent : 'text.secondary', '&:hover': { color: accent } }}
+                          >
+                            {p.row.is_default ? <StarIcon sx={{ fontSize: 15 }} /> : <StarOutlineIcon sx={{ fontSize: 15 }} />}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Edit">
+                        <IconButton size="small" onClick={() => openEditModel(p.row)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+                          <EditIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton size="small" onClick={() => setDeleteAiDialog({ id: p.row.id, name: p.row.name })} sx={{ color: 'text.secondary', '&:hover': { color: '#c98f8f' } }}>
+                          <DeleteIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  ),
+                },
+              ]}
+            />
+          </Card>
+        </Box>
+      )}
+
       {/* ── Invite user dialog ────────────────────────────────────────────── */}
       <InviteDialog
         open={inviteOpen}
@@ -1255,6 +1462,112 @@ export default function Admin() {
           </Button>
           <Button onClick={handleEditSave} disabled={actionLoading} variant="contained" startIcon={actionLoading ? <CircularProgress size={14} /> : <SaveIcon sx={{ fontSize: 15 }} />} sx={{ bgcolor: 'primary.main', color: 'background.default', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
             {actionLoading ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Add / Edit AI Model dialog ───────────────────────────────────── */}
+      <Dialog open={Boolean(aiModelDialog)} onClose={() => setAiModelDialog(null)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.4rem', color: 'text.primary', pb: 1 }}>
+          {aiModelDialog === 'add' ? 'Add AI Model' : 'Edit AI Model'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'grid', gap: 2, mt: 0.5 }}>
+            <TextField
+              label="Display name *"
+              size="small"
+              fullWidth
+              autoFocus
+              value={aiModelForm.name}
+              onChange={(e) => setAiModelForm((p) => ({ ...p, name: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+            <FormControl size="small" fullWidth>
+              <InputLabel sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem' }}>Provider *</InputLabel>
+              <Select
+                value={aiModelForm.provider}
+                label="Provider *"
+                onChange={(e) => setAiModelForm((p) => ({ ...p, provider: e.target.value }))}
+                sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem' }}
+              >
+                {['gemini', 'openai', 'anthropic', 'grok', 'generic'].map((p) => (
+                  <MenuItem key={p} value={p} sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.78rem' }}>{p}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Model ID *"
+              size="small"
+              fullWidth
+              placeholder="e.g. gemini-2.0-flash, gpt-4o, claude-sonnet-4-6"
+              value={aiModelForm.model_id}
+              onChange={(e) => setAiModelForm((p) => ({ ...p, model_id: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem' } }}
+            />
+            <TextField
+              label={aiModelDialog === 'add' ? 'API Key *' : 'API Key (leave blank to keep existing)'}
+              size="small"
+              fullWidth
+              type="password"
+              value={aiModelForm.api_key}
+              onChange={(e) => setAiModelForm((p) => ({ ...p, api_key: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem' } }}
+            />
+            {(aiModelForm.provider === 'generic' || aiModelForm.provider === 'grok') && (
+              <TextField
+                label={aiModelForm.provider === 'grok' ? 'Base URL (default: https://api.x.ai/v1)' : 'Base URL *'}
+                size="small"
+                fullWidth
+                placeholder="https://api.example.com/v1"
+                value={aiModelForm.base_url}
+                onChange={(e) => setAiModelForm((p) => ({ ...p, base_url: e.target.value }))}
+                sx={{ '& .MuiInputBase-root': { fontFamily: '"JetBrains Mono", monospace', fontSize: '0.8rem' } }}
+              />
+            )}
+            <Box sx={{ display: 'flex', gap: 3 }}>
+              <FormControlLabel
+                control={<Switch size="small" checked={aiModelForm.is_default} onChange={(e) => setAiModelForm((p) => ({ ...p, is_default: e.target.checked }))} />}
+                label={<Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem' }}>Set as default</Typography>}
+              />
+              <FormControlLabel
+                control={<Switch size="small" checked={aiModelForm.is_active} onChange={(e) => setAiModelForm((p) => ({ ...p, is_active: e.target.checked }))} />}
+                label={<Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem' }}>Active</Typography>}
+              />
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setAiModelDialog(null)} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveAiModel}
+            disabled={aiModelLoading || !aiModelForm.name.trim() || !aiModelForm.model_id.trim()}
+            variant="contained"
+            startIcon={aiModelLoading ? <CircularProgress size={14} /> : <SaveIcon sx={{ fontSize: 15 }} />}
+            sx={{ bgcolor: 'primary.main', color: 'background.default', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}
+          >
+            {aiModelLoading ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Delete AI Model dialog ───────────────────────────────────────── */}
+      <Dialog open={Boolean(deleteAiDialog)} onClose={() => setDeleteAiDialog(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.3rem', color: 'text.primary', pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningAmberIcon sx={{ fontSize: 20, color: '#b45050' }} /> Delete model?
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', color: 'text.secondary', lineHeight: 1.7 }}>
+            Remove <strong style={{ color: theme.palette.text.primary }}>{deleteAiDialog?.name}</strong> from the platform. The API key stored for this model will be permanently deleted.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setDeleteAiDialog(null)} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteAiModel} disabled={aiModelLoading} variant="contained" startIcon={aiModelLoading ? <CircularProgress size={14} /> : <DeleteIcon sx={{ fontSize: 15 }} />} sx={{ bgcolor: '#8f4a4a', '&:hover': { bgcolor: '#b45050' }, fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            {aiModelLoading ? 'Deleting…' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

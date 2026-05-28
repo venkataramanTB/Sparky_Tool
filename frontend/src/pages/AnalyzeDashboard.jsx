@@ -241,7 +241,7 @@ function DropZone({ onFile, loading }) {
         <Box>
           <CircularProgress size={34} sx={{ color: accent, mb: 2 }} />
           <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', color: 'text.secondary', mb: 0.5 }}>
-            Gemini is analysing your data…
+            AI is analysing your data…
           </Typography>
           <Typography sx={{ fontSize: '0.68rem', color: 'text.disabled' }}>
             This takes 5 – 15 seconds depending on file size
@@ -402,7 +402,7 @@ export default function AnalyzeDashboard() {
           AI Chart Analyser
         </Typography>
         <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>
-          — upload any CSV or Excel and Gemini auto-generates charts
+          — upload any CSV or Excel and AI auto-generates charts
         </Typography>
       </Box>
 
