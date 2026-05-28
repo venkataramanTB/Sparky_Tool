@@ -79,20 +79,6 @@ export const getCoreHRFiles    = (token)           => client.get('/v2/insights/c
 export const getCoreHRFile     = (filename, token) => client.get('/v2/insights/corehr/file',  { headers: auth(token), params: { filename } })
 export const checkConnectivity = (token)           => client.get('/v2/insights/health',       { headers: auth(token) })
 
-// AI file analyser (v2) — relies on the request interceptor for the Bearer token.
-// We delete Content-Type so the browser sets multipart/form-data with the correct
-// boundary automatically (the client default of application/json would break the upload).
-export const analyzeFile = (file) => {
-  const fd = new FormData()
-  fd.append('file', file)
-  return client.post('/v2/insights/analyze-file', fd, {
-    transformRequest: [(data, headers) => {
-      delete headers['Content-Type']
-      return data
-    }],
-  })
-}
-
 // File analysis via Gemini (v2)
 // Pass a File object; the endpoint returns a chart-spec JSON.
 export const analyzeFile = (file, token) => {
@@ -102,3 +88,10 @@ export const analyzeFile = (file, token) => {
     headers: { ...auth(token), 'Content-Type': 'multipart/form-data' },
   })
 }
+
+// AI Models admin (v2)
+export const listAiModels      = (token)                => client.get('/v2/admin/ai-models',                    { headers: auth(token) })
+export const createAiModel     = (payload, token)       => client.post('/v2/admin/ai-models',         payload,  { headers: auth(token) })
+export const updateAiModel     = (id, payload, token)   => client.put(`/v2/admin/ai-models/${id}`,    payload,  { headers: auth(token) })
+export const deleteAiModel     = (id, token)            => client.delete(`/v2/admin/ai-models/${id}`,           { headers: auth(token) })
+export const setDefaultAiModel = (id, token)            => client.post(`/v2/admin/ai-models/${id}/set-default`, null, { headers: auth(token) })
