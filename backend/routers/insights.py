@@ -387,7 +387,14 @@ async def analyze_file(
 
     try:
         if ext == "csv":
-            df = pd.read_csv(io.BytesIO(raw), on_bad_lines="skip")
+            for _enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+                try:
+                    df = pd.read_csv(io.BytesIO(raw), encoding=_enc, on_bad_lines="skip")
+                    break
+                except UnicodeDecodeError:
+                    continue
+            else:
+                raise HTTPException(422, "Could not decode CSV — try saving the file as UTF-8")
         elif ext in ("xlsx", "xlsm"):
             df = pd.read_excel(io.BytesIO(raw), engine="openpyxl")
         elif ext == "xls":
