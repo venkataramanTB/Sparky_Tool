@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import {
-  AppBar, Toolbar, Box, Typography, Tabs, Tab,
-  IconButton, Menu, MenuItem, Avatar, Chip, Tooltip,
+  AppBar, Toolbar, Box, Typography,
+  Avatar, Chip, Tooltip,
   Divider, ListItemIcon, ListItemText, Switch,
+  Menu, MenuItem,
   Dialog, DialogContent,
 } from '@mui/material'
 import GridViewIcon           from '@mui/icons-material/GridView'
@@ -11,7 +12,6 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
 import ManageAccountsIcon     from '@mui/icons-material/ManageAccounts'
 import PaletteIcon            from '@mui/icons-material/Palette'
 import PersonIcon             from '@mui/icons-material/Person'
-import AccountCircleIcon      from '@mui/icons-material/AccountCircle'
 import SettingsIcon           from '@mui/icons-material/Settings'
 import LogoutIcon             from '@mui/icons-material/Logout'
 import LightModeIcon          from '@mui/icons-material/LightMode'
@@ -38,14 +38,63 @@ const menuPaperSx = {
   backgroundImage: 'none',
 }
 
+// Shared expand transition used by all pills
+const expandTransition = 'max-width 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.15s ease, padding-left 0.22s ease'
+
+function NavPill({ icon: Icon, label, active, onClick, accent }) {
+  const [hovered, setHovered] = useState(false)
+  const expanded = active || hovered
+
+  return (
+    <Box
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      sx={{
+        display: 'flex', alignItems: 'center',
+        height: 52, px: 1.25,
+        cursor: 'pointer',
+        borderBottom: `2px solid ${active ? accent : 'transparent'}`,
+        bgcolor: hovered ? `${accent}0e` : 'transparent',
+        transition: 'background 0.15s ease, border-color 0.15s ease',
+      }}
+    >
+      <Icon sx={{
+        fontSize: 15, flexShrink: 0,
+        color: active ? accent : hovered ? `${accent}cc` : 'text.secondary',
+        transition: 'color 0.15s ease',
+      }} />
+      <Box sx={{
+        overflow: 'hidden',
+        maxWidth: expanded ? 150 : 0,
+        opacity: expanded ? 1 : 0,
+        paddingLeft: expanded ? '6px' : 0,
+        transition: expandTransition,
+      }}>
+        <Typography sx={{
+          fontFamily: '"Raleway", sans-serif',
+          fontWeight: 600, fontSize: '0.63rem', letterSpacing: '0.12em',
+          textTransform: 'uppercase', whiteSpace: 'nowrap',
+          color: active ? accent : 'text.secondary',
+        }}>
+          {label}
+        </Typography>
+      </Box>
+    </Box>
+  )
+}
+
 export default function Topbar({ route, navigate, user, onSignOut }) {
   const { mode, accent, toggleMode, setAccentColor } = useThemeContext()
 
-  const [accountAnchor, setAccountAnchor] = useState(null)
-  const [themeAnchor,   setThemeAnchor]   = useState(null)
-  const [userAnchor,    setUserAnchor]    = useState(null)
-  const [aboutOpen,     setAboutOpen]     = useState(false)
-  const [dogHistoryOpen, setDogHistoryOpen] = useState(false)
+  const [accountAnchor,    setAccountAnchor]    = useState(null)
+  const [themeAnchor,      setThemeAnchor]      = useState(null)
+  const [userAnchor,       setUserAnchor]       = useState(null)
+  const [aboutOpen,        setAboutOpen]        = useState(false)
+  const [dogHistoryOpen,   setDogHistoryOpen]   = useState(false)
+  const [accountHovered,   setAccountHovered]   = useState(false)
+  const [themeHovered,     setThemeHovered]     = useState(false)
+  const [userPillHovered,  setUserPillHovered]  = useState(false)
 
   const navItems = [...NAV_BASE]
   if (user?.role === 'admin') navItems.push({ id: 'admin', label: 'Admin', icon: AdminPanelSettingsIcon })
@@ -70,7 +119,6 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
 
         {/* ── Brand ───────────────────────────────── */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 1.5, flexShrink: 0 }}>
-          {/* Dog logo — click opens the history dialog */}
           <Tooltip title="Did you know? — The story of Sparky" placement="bottom" arrow>
             <Box
               onClick={() => setDogHistoryOpen(true)}
@@ -87,7 +135,6 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
               <SparkyDog size={34} circular />
             </Box>
           </Tooltip>
-          {/* Text — click navigates to dashboard */}
           <Box
             onClick={() => navigate('dashboard')}
             sx={{ display: { xs: 'none', sm: 'block' }, cursor: 'pointer' }}
@@ -101,60 +148,55 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
           </Box>
         </Box>
 
-        {/* ── Nav Tabs ─────────────────────────────── */}
-        <Tabs
-          value={navItems.some((n) => n.id === route) ? route : false}
-          onChange={(_, v) => navigate(v)}
-          sx={{
-            minHeight: 52,
-            '& .MuiTab-root': {
-              minHeight: 52,
-              fontFamily: '"Raleway", sans-serif',
-              fontWeight: 600,
-              fontSize: '0.63rem',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'text.secondary',
-              gap: 0.5,
-              px: { xs: 1, sm: 1.5 },
-              minWidth: 0,
-            },
-            '& .Mui-selected': { color: accent },
-            '& .MuiTabs-indicator': { bgcolor: accent, height: 2 },
-          }}
-        >
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <Tab key={id} value={id} label={label} icon={<Icon sx={{ fontSize: 15 }} />} iconPosition="start" />
+        {/* ── Nav Pills ─────────────────────────────── */}
+        <Box sx={{ display: 'flex', alignItems: 'center', height: 52 }}>
+          {navItems.map(({ id, label, icon }) => (
+            <NavPill
+              key={id}
+              icon={icon}
+              label={label}
+              active={route === id}
+              onClick={() => navigate(id)}
+              accent={accent}
+            />
           ))}
-        </Tabs>
+        </Box>
 
         <Box sx={{ flex: 1 }} />
 
         {/* ── Account / Persona picker ─────────────── */}
-        <Tooltip title="Account & profile" arrow>
-          <Box
-            onClick={(e) => setAccountAnchor(e.currentTarget)}
-            sx={{
-              display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer',
-              px: 1.5, py: 0.6, borderRadius: 1,
-              border: '1px solid', borderColor: 'divider',
-              '&:hover': { borderColor: accent, bgcolor: `${accent}12` },
-              transition: 'all 0.15s ease',
-              flexShrink: 0,
-            }}
-          >
-            <ManageAccountsIcon sx={{ fontSize: 16, color: accent }} />
+        <Box
+          onClick={(e) => setAccountAnchor(e.currentTarget)}
+          onMouseEnter={() => setAccountHovered(true)}
+          onMouseLeave={() => setAccountHovered(false)}
+          sx={{
+            display: 'flex', alignItems: 'center', cursor: 'pointer',
+            px: 1.25, height: 34, borderRadius: 1,
+            border: '1px solid',
+            borderColor: accountHovered ? accent : 'divider',
+            bgcolor: accountHovered ? `${accent}12` : 'transparent',
+            transition: 'border-color 0.15s ease, background 0.15s ease',
+            flexShrink: 0,
+          }}
+        >
+          <ManageAccountsIcon sx={{ fontSize: 16, color: accent, flexShrink: 0 }} />
+          <Box sx={{
+            overflow: 'hidden',
+            maxWidth: accountHovered ? 140 : 0,
+            opacity: accountHovered ? 1 : 0,
+            paddingLeft: accountHovered ? '6px' : 0,
+            transition: expandTransition,
+          }}>
             <Typography sx={{
               fontFamily: '"Raleway", sans-serif', fontSize: '0.63rem', fontWeight: 600,
               letterSpacing: '0.08em', color: 'text.primary', textTransform: 'uppercase',
-              maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              display: { xs: 'none', md: 'block' },
+              whiteSpace: 'nowrap',
             }}>
               {displayName}
             </Typography>
-            <ExpandMoreIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
           </Box>
-        </Tooltip>
+          <ExpandMoreIcon sx={{ fontSize: 14, color: 'text.disabled', flexShrink: 0, ml: 0.5 }} />
+        </Box>
 
         <Menu
           anchorEl={accountAnchor}
@@ -216,15 +258,36 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
         </Menu>
 
         {/* ── Theme picker ─────────────────────────── */}
-        <Tooltip title="Theme settings" arrow>
-          <IconButton
-            onClick={(e) => setThemeAnchor(e.currentTarget)}
-            size="small"
-            sx={{ color: mode === 'light' ? accent : 'text.secondary', '&:hover': { color: accent, bgcolor: `${accent}12` } }}
-          >
-            <PaletteIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        <Box
+          onClick={(e) => setThemeAnchor(e.currentTarget)}
+          onMouseEnter={() => setThemeHovered(true)}
+          onMouseLeave={() => setThemeHovered(false)}
+          sx={{
+            display: 'flex', alignItems: 'center',
+            height: 34, px: 0.75, borderRadius: 1,
+            cursor: 'pointer',
+            color: themeHovered ? accent : 'text.secondary',
+            bgcolor: themeHovered ? `${accent}12` : 'transparent',
+            transition: 'color 0.15s ease, background 0.15s ease',
+          }}
+        >
+          <PaletteIcon sx={{ fontSize: 16, flexShrink: 0, color: 'inherit' }} />
+          <Box sx={{
+            overflow: 'hidden',
+            maxWidth: themeHovered ? 80 : 0,
+            opacity: themeHovered ? 1 : 0,
+            paddingLeft: themeHovered ? '6px' : 0,
+            transition: expandTransition,
+          }}>
+            <Typography sx={{
+              fontFamily: '"Raleway", sans-serif', fontSize: '0.63rem', fontWeight: 600,
+              letterSpacing: '0.12em', textTransform: 'uppercase', whiteSpace: 'nowrap',
+              color: accent,
+            }}>
+              Theme
+            </Typography>
+          </Box>
+        </Box>
 
         <Menu
           anchorEl={themeAnchor}
@@ -280,13 +343,39 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
         </Menu>
 
         {/* ── User menu ────────────────────────────── */}
-        <Tooltip title="User menu" arrow>
-          <IconButton onClick={(e) => setUserAnchor(e.currentTarget)} size="small" sx={{ p: 0.3 }}>
-            <Avatar sx={{ width: 30, height: 30, bgcolor: accent, color: '#0b0c0e', fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.68rem' }}>
-              {initials}
-            </Avatar>
-          </IconButton>
-        </Tooltip>
+        <Box
+          onClick={(e) => setUserAnchor(e.currentTarget)}
+          onMouseEnter={() => setUserPillHovered(true)}
+          onMouseLeave={() => setUserPillHovered(false)}
+          sx={{
+            display: 'flex', alignItems: 'center',
+            height: 34, pl: 0.4, pr: 0.4,
+            borderRadius: 5,
+            cursor: 'pointer',
+            border: '1px solid',
+            borderColor: userPillHovered ? accent : 'transparent',
+            bgcolor: userPillHovered ? `${accent}0e` : 'transparent',
+            transition: 'border-color 0.15s ease, background 0.15s ease',
+          }}
+        >
+          <Avatar sx={{ width: 28, height: 28, bgcolor: accent, color: '#0b0c0e', fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.65rem', flexShrink: 0 }}>
+            {initials}
+          </Avatar>
+          <Box sx={{
+            overflow: 'hidden',
+            maxWidth: userPillHovered ? 140 : 0,
+            opacity: userPillHovered ? 1 : 0,
+            paddingLeft: userPillHovered ? '8px' : 0,
+            transition: expandTransition,
+          }}>
+            <Typography sx={{
+              fontFamily: '"Raleway", sans-serif', fontSize: '0.63rem', fontWeight: 600,
+              letterSpacing: '0.08em', color: 'text.primary', whiteSpace: 'nowrap',
+            }}>
+              {displayName}
+            </Typography>
+          </Box>
+        </Box>
 
         <Menu
           anchorEl={userAnchor}
@@ -387,7 +476,6 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
         {/* Story body */}
         <Box sx={{ px: 3.5, py: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
-          {/* Story sections */}
           {[
             {
               year: '1987',
@@ -421,7 +509,6 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
             },
           ].map(({ year, title, body }, i) => (
             <Box key={i} sx={{ display: 'flex', gap: 2 }}>
-              {/* Timeline spine */}
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 56 }}>
                 <Typography sx={{
                   fontFamily: '"JetBrains Mono", monospace',
@@ -433,7 +520,6 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
                 </Typography>
                 <Box sx={{ width: '1px', flex: 1, mt: 0.5, bgcolor: i < 5 ? `${accent}30` : 'transparent' }} />
               </Box>
-              {/* Content */}
               <Box sx={{ pb: i < 5 ? 1 : 0 }}>
                 <Typography sx={{
                   fontFamily: '"Raleway", sans-serif',
@@ -453,7 +539,6 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
             </Box>
           ))}
 
-          {/* Quick-fact chips */}
           <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2.5, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {[
               ['Founded', '1987'],
@@ -500,17 +585,14 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
         },
       }}
     >
-      {/* top accent line */}
       <Box sx={{ height: 2, background: `linear-gradient(90deg, transparent 0%, ${accent} 30%, ${accent}dd 70%, transparent 100%)` }} />
 
       <DialogContent sx={{ textAlign: 'center', px: 4, py: 3.5 }}>
 
-        {/* dog illustration */}
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5 }}>
           <SparkyDog size={160} />
         </Box>
 
-        {/* title */}
         <Typography sx={{
           fontFamily: '"Cormorant Garamond", serif',
           fontSize: '2.4rem', fontWeight: 700,
@@ -526,10 +608,8 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
           PeopleSoft Analytics Tool
         </Typography>
 
-        {/* divider */}
         <Box sx={{ height: '1px', bgcolor: 'divider', my: 2.5 }} />
 
-        {/* origin story */}
         <Typography sx={{
           fontFamily: '"Raleway", sans-serif',
           fontSize: '0.8rem', color: 'text.secondary',
@@ -540,7 +620,6 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
           His spirit lives on in every run.
         </Typography>
 
-        {/* credits table */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, textAlign: 'left', mb: 2.5 }}>
           {[
             ['Frontend',  'React 18 · MUI v5 · Recharts · Vite'],
