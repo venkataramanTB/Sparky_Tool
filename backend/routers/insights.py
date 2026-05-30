@@ -17,6 +17,7 @@ from openai import OpenAI
 import anthropic as _anthropic_sdk
 from models import User, UserConfig, AiModel
 from logger import get_logger
+from pii_masker import PIIMasker
 
 log = get_logger("insights")
 router = APIRouter(prefix="/api/v2/insights", tags=["insights"])
@@ -443,6 +444,14 @@ async def analyze_file(
         user.id[:8], fname, profile["total_rows"], profile["total_columns"],
     )
 
+    # ── PII masking — protect sensitive values before they reach the LLM ─────
+    masker = PIIMasker()
+    masked_profile, n_masked = masker.mask_profile(profile)
+    log.info(
+        "analyze_file  pii_masked=%d  spacy=%s  user=%s",
+        n_masked, masker.spacy_active, user.id[:8],
+    )
+
     # ── resolve the active AI model ──────────────────────────────────────────
     if ai_model_id is not None:
         db_model = db.query(AiModel).filter(
@@ -472,7 +481,7 @@ async def analyze_file(
 
     # ── call the provider ────────────────────────────────────────────────────
     prompt = _CHART_PROMPT.format(
-        profile=json.dumps(profile, indent=2, default=str),
+        profile=json.dumps(masked_profile, indent=2, default=str),
         colors=", ".join(_GEMINI_COLORS),
     )
 
@@ -542,6 +551,11 @@ async def analyze_file(
         log.error("AI provider call failed provider=%s: %s", provider, exc)
         raise HTTPException(502, f"AI provider error: {exc}") from exc
 
+    # ── De-anonymize — restore original values in the LLM response ───────────
+    if masker.masked_count:
+        chart_spec = masker.demask_obj(chart_spec)
+        log.info("analyze_file  pii_demasked=%d  user=%s", masker.masked_count, user.id[:8])
+
     # ── Record conversation + token usage ────────────────────────────────────
     try:
         from routers.conversations import record_analysis_conversation
@@ -571,6 +585,9 @@ async def analyze_file(
         "total_columns":   profile["total_columns"],
         "columns":         [c["name"] for c in profile["columns"]],
         "conversation_id": conversation_id,
+        "pii_protected":   masker.masked_count > 0,
+        "pii_masked_count": masker.masked_count,
+        "pii_spacy":       masker.spacy_active,
         "token_usage": {
             "prompt":     prompt_tokens,
             "completion": completion_tokens,

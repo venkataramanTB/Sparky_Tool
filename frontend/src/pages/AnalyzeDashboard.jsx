@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Box, Typography, Alert, CircularProgress, Grid, Card, CardContent,
-  Button, Chip, Select, MenuItem, FormControl,
+  Button, Chip, Select, MenuItem, FormControl, Tooltip,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import {
@@ -290,10 +290,17 @@ function DropZone({ onFile, loading }) {
 function SummaryBar({ result, filename }) {
   const theme  = useTheme()
   const accent = theme.palette.primary.main
+
+  const totalRows  = result.meta?.total_rows    ?? result.row_count
+  const totalCols  = result.meta?.total_columns ?? result.col_count
+  const piiActive  = result.meta?.pii_protected
+  const piiCount   = result.meta?.pii_masked_count ?? 0
+  const spacyUsed  = result.meta?.pii_spacy
+
   return (
     <Card variant="outlined" sx={{ bgcolor: `${accent}07`, borderColor: `${accent}20`, mb: 3 }}>
       <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
           <TableChartIcon sx={{ fontSize: 15, color: accent }} />
           <Typography sx={{
             fontFamily: '"Raleway", sans-serif', fontWeight: 700,
@@ -303,12 +310,12 @@ function SummaryBar({ result, filename }) {
             {filename}
           </Typography>
           <Chip
-            label={`${result.row_count?.toLocaleString()} rows`}
+            label={`${totalRows?.toLocaleString() ?? '—'} rows`}
             size="small"
             sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
           />
           <Chip
-            label={`${result.col_count} columns`}
+            label={`${totalCols ?? '—'} columns`}
             size="small"
             sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
           />
@@ -317,8 +324,31 @@ function SummaryBar({ result, filename }) {
             size="small"
             sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
           />
+
+          {/* PII protection badge */}
+          {piiActive && (
+            <Tooltip
+              title={`${piiCount} sensitive value${piiCount !== 1 ? 's' : ''} were masked before sending to the AI${spacyUsed ? ' (regex + spaCy NER)' : ' (regex patterns)'} and restored afterward. The AI never saw your raw data.`}
+              arrow
+              placement="top"
+            >
+              <Chip
+                icon={<span style={{ fontSize: 11, lineHeight: 1, marginLeft: 6 }}>🛡</span>}
+                label={`PII protected · ${piiCount} values`}
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(107,143,113,0.12)',
+                  color: '#6b8f71',
+                  border: '1px solid rgba(107,143,113,0.25)',
+                  fontFamily: '"Raleway", sans-serif',
+                  fontSize: '0.6rem', height: 20,
+                  cursor: 'help',
+                }}
+              />
+            </Tooltip>
+          )}
         </Box>
-        <Typography sx={{ fontSize: '0.78rem', color: 'text.primary', lineHeight: 1.65 }}>
+        <Typography sx={{ fontSize: '0.78rem', color: 'text.primary', lineHeight: 1.75 }}>
           {result.summary}
         </Typography>
       </CardContent>
