@@ -48,6 +48,7 @@ class ConfigPayload(BaseModel):
     win_connection_type: str = "winrm"   # winrm | smb | ssh
     win_share: str = "C$"
     win_domain: str = ""
+    engine_id: int | None = None
 
 
 def _serialize(config: UserConfig) -> dict:
@@ -84,6 +85,7 @@ def _serialize(config: UserConfig) -> dict:
         "win_connection_type": config.win_connection_type or "winrm",
         "win_share":           config.win_share or "C$",
         "win_domain":          config.win_domain or "",
+        "engine_id":          config.engine_id,
         "is_active":          config.is_active,
         "created_at":         config.created_at,
         "updated_at":         config.updated_at,
@@ -136,6 +138,7 @@ def create_config(
         win_connection_type=body.win_connection_type,
         win_share=body.win_share,
         win_domain=body.win_domain,
+        engine_id=body.engine_id,
     )
     db.add(config)
     db.add(AuditEvent(user_id=user.id, event_type="config_created", detail={"name": body.name}))
@@ -202,6 +205,7 @@ def update_config(
     config.win_connection_type = body.win_connection_type
     config.win_share           = body.win_share
     config.win_domain          = body.win_domain
+    config.engine_id           = body.engine_id
     config.updated_at         = datetime.now(timezone.utc)
 
     if body.ps_password and body.ps_password != "***":

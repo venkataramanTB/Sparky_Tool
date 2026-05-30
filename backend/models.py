@@ -57,9 +57,24 @@ class UserConfig(Base):
     win_connection_type = Column(String, default="winrm")   # winrm | smb | ssh
     win_share           = Column(String, default="C$")       # SMB share (admin share by default)
     win_domain          = Column(String, default="")         # domain for SMB / Kerberos
+    engine_id           = Column(Integer, ForeignKey("engines.id", ondelete="SET NULL"), nullable=True)
     is_active           = Column(Boolean, default=True)
     created_at         = Column(TIMESTAMP(timezone=True), default=_now)
     updated_at         = Column(TIMESTAMP(timezone=True), default=_now)
+
+
+class Engine(Base):
+    """Named PeopleSoft environment managed by admins and selectable in user configs."""
+    __tablename__ = "engines"
+    __table_args__ = (Index("idx_engines_sort", "sort_order"),)
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    name        = Column(String(200), nullable=False)
+    description = Column(Text, default="")
+    is_active   = Column(Boolean, default=True)
+    sort_order  = Column(Integer, default=0)
+    created_by  = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
+    created_at  = Column(TIMESTAMP(timezone=True), default=_now)
+    updated_at  = Column(TIMESTAMP(timezone=True), default=_now)
 
 
 class RunLog(Base):

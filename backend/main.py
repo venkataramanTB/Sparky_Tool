@@ -143,6 +143,7 @@ try:
     from routers import users as _u, configs as _c, runs as _r, admin as _a, insights as _i
     from routers import wide_events as _we, preferences as _pref, feature_flags as _ff
     from routers import conversations as _conv
+    from routers import engines as _eng
     from database import get_db
     from models import UserConfig, RunLog, AuditEvent
     from auth import get_current_user
@@ -157,6 +158,7 @@ try:
     app.include_router(_pref.router)
     app.include_router(_ff.router)
     app.include_router(_conv.router)
+    app.include_router(_eng.router)
     _v2_enabled = True
 
     def _config_to_ns(config: UserConfig) -> SimpleNamespace:

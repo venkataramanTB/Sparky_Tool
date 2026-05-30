@@ -59,6 +59,7 @@ import {
   listAdminFeatureFlags, createFeatureFlag, updateFeatureFlag,
   toggleFeatureFlag, deleteFeatureFlag,
   adminConvStats,
+  listAdminEngines, createEngine, updateEngine, deleteEngine,
 } from '../api'
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
@@ -374,6 +375,13 @@ export default function Admin() {
   const [flagLoading,    setFlagLoading]    = useState(false)
   const [deleteFlagDlg,  setDeleteFlagDlg]  = useState(null) // { id, key }
 
+  // ── Engines ───────────────────────────────────────────────────────────────
+  const [engines,       setEngines]       = useState([])
+  const [engineDialog,  setEngineDialog]  = useState(null) // null | 'add' | engine-object
+  const [engineForm,    setEngineForm]    = useState({ name: '', description: '', is_active: true, sort_order: 0 })
+  const [engineLoading, setEngineLoading] = useState(false)
+  const [deleteEngDlg,  setDeleteEngDlg]  = useState(null) // null | { id, name }
+
   // ── AI Usage ──────────────────────────────────────────────────────────────
   const [aiUsage, setAiUsage] = useState(null)
 
@@ -399,8 +407,9 @@ export default function Admin() {
       listAiModels(token),
       listAdminFeatureFlags(token),
       adminConvStats(token).catch(() => ({ data: null })),
+      listAdminEngines(token),
     ])
-      .then(([statsRes, logsRes, usersRes, runsRes, aiRes, flagRes, usageRes]) => {
+      .then(([statsRes, logsRes, usersRes, runsRes, aiRes, flagRes, usageRes, engRes]) => {
         setStats(statsRes.data)
         setLogs(logsRes.data.items ?? [])
         setUsers(usersRes.data.items ?? [])
@@ -408,6 +417,7 @@ export default function Admin() {
         setAiModels(aiRes.data.items ?? [])
         setFlags(flagRes.data.items ?? [])
         if (usageRes.data) setAiUsage(usageRes.data)
+        setEngines(engRes.data.items ?? [])
         setError(null)
       })
       .catch((err) => setError(err.response?.data?.detail || 'Unable to load admin data'))
@@ -605,6 +615,50 @@ export default function Admin() {
     }
   }
 
+  // ── Engine actions ────────────────────────────────────────────────────────
+
+  const openAddEngine = () => {
+    setEngineForm({ name: '', description: '', is_active: true, sort_order: 0 })
+    setEngineDialog('add')
+  }
+
+  const openEditEngine = (e) => {
+    setEngineForm({ name: e.name, description: e.description, is_active: e.is_active, sort_order: e.sort_order })
+    setEngineDialog(e)
+  }
+
+  const handleSaveEngine = async () => {
+    setEngineLoading(true)
+    try {
+      if (engineDialog === 'add') {
+        const res = await createEngine(engineForm, token)
+        setEngines((prev) => [...prev, res.data])
+      } else {
+        const res = await updateEngine(engineDialog.id, engineForm, token)
+        setEngines((prev) => prev.map((e) => e.id === res.data.id ? res.data : e))
+      }
+      setEngineDialog(null)
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to save engine')
+    } finally {
+      setEngineLoading(false)
+    }
+  }
+
+  const handleDeleteEngine = async () => {
+    if (!deleteEngDlg) return
+    setEngineLoading(true)
+    try {
+      await deleteEngine(deleteEngDlg.id, token)
+      setEngines((prev) => prev.filter((e) => e.id !== deleteEngDlg.id))
+      setDeleteEngDlg(null)
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to delete engine')
+    } finally {
+      setEngineLoading(false)
+    }
+  }
+
   // ── guards ────────────────────────────────────────────────────────────────
 
   if (!user?.role || user.role !== 'admin') {
@@ -750,6 +804,7 @@ export default function Admin() {
         <Tab label={tabLabel('Events', wideEventsTotal || undefined)} icon={<TimelineIcon sx={{ fontSize: 14 }} />} iconPosition="start" onClick={() => { if (wideEvents.length === 0) loadWideEvents() }} />
         <Tab label={tabLabel('Feature Flags', flags.length)} icon={<FlagIcon sx={{ fontSize: 14 }} />} iconPosition="start" />
         <Tab label={tabLabel('AI Usage')}             icon={<AccountBalanceWalletIcon sx={{ fontSize: 14 }} />} iconPosition="start" />
+        <Tab label={tabLabel('Engines', engines.length)} icon={<StorageIcon sx={{ fontSize: 14 }} />} iconPosition="start" />
       </Tabs>
 
       {/* ═══ TAB 0: OVERVIEW ════════════════════════════════════════════════ */}
@@ -1853,6 +1908,181 @@ export default function Admin() {
           </Button>
           <Button onClick={handleEditSave} disabled={actionLoading} variant="contained" startIcon={actionLoading ? <CircularProgress size={14} /> : <SaveIcon sx={{ fontSize: 15 }} />} sx={{ bgcolor: 'primary.main', color: 'background.default', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
             {actionLoading ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ═══ TAB 8: ENGINES ════════════════════════════════════════════════ */}
+      {tab === 8 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.65rem', color: 'text.disabled', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              {engines.length} engine{engines.length !== 1 ? 's' : ''} configured
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+              onClick={openAddEngine}
+              sx={{
+                bgcolor: 'primary.main', color: 'background.default',
+                fontFamily: '"Raleway", sans-serif', fontWeight: 700,
+                fontSize: '0.7rem', letterSpacing: '0.1em',
+                px: 2.5, py: 0.9, borderRadius: '1px',
+                boxShadow: `0 2px 12px ${accent}30`,
+                '&:hover': { bgcolor: 'primary.light' },
+              }}
+            >
+              Add Engine
+            </Button>
+          </Box>
+
+          <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
+            {engines.length === 0 ? (
+              <Box sx={{ py: 8, textAlign: 'center' }}>
+                <StorageIcon sx={{ fontSize: 36, color: 'text.disabled', mb: 2 }} />
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', color: 'text.disabled' }}>
+                  No engines yet. Add the first one.
+                </Typography>
+              </Box>
+            ) : (
+              <DataGrid
+                rows={engines}
+                getRowId={(r) => r.id}
+                autoHeight
+                disableRowSelectionOnClick
+                pageSizeOptions={[25, 50]}
+                initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+                sx={{ ...getDataGridSx(accent, dark ? 'dark' : 'light'), border: 'none', borderRadius: 0 }}
+                columns={[
+                  {
+                    field: 'name', headerName: 'Name', flex: 1, minWidth: 160,
+                    renderCell: (p) => (
+                      <Box>
+                        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.76rem', fontWeight: 700, color: 'text.primary' }}>{p.value}</Typography>
+                        {p.row.description && <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.63rem', color: 'text.disabled' }}>{p.row.description}</Typography>}
+                      </Box>
+                    ),
+                  },
+                  {
+                    field: 'is_active', headerName: 'Status', width: 110,
+                    renderCell: (p) => (
+                      <Chip
+                        label={p.value ? 'Active' : 'Inactive'}
+                        size="small"
+                        sx={{
+                          bgcolor: p.value ? 'rgba(107,143,113,0.14)' : 'rgba(128,128,128,0.1)',
+                          color:   p.value ? '#6b8f71' : 'text.secondary',
+                          fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 22,
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    field: 'sort_order', headerName: 'Order', width: 80,
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', color: 'text.secondary' }}>{p.value}</Typography>,
+                  },
+                  {
+                    field: 'created_at', headerName: 'Created', width: 140,
+                    renderCell: (p) => <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', color: 'text.secondary' }}>{fmtDate(p.value)}</Typography>,
+                  },
+                  {
+                    field: 'actions', headerName: 'Actions', width: 90, sortable: false,
+                    renderCell: (p) => (
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="Edit engine">
+                          <IconButton size="small" onClick={() => openEditEngine(p.row)} sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+                            <EditIcon sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete engine">
+                          <IconButton size="small" onClick={() => setDeleteEngDlg({ id: p.row.id, name: p.row.name })} sx={{ color: 'text.secondary', '&:hover': { color: '#c98f8f' } }}>
+                            <DeleteIcon sx={{ fontSize: 15 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    ),
+                  },
+                ]}
+              />
+            )}
+          </Card>
+        </Box>
+      )}
+
+      {/* ── Add / Edit Engine dialog ──────────────────────────────────────── */}
+      <Dialog open={Boolean(engineDialog)} onClose={() => setEngineDialog(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.4rem', color: 'text.primary', pb: 1 }}>
+          {engineDialog === 'add' ? 'Add Engine' : 'Edit Engine'}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'grid', gap: 2, pt: 0.5 }}>
+            <TextField
+              label="Name *"
+              size="small"
+              fullWidth
+              autoFocus
+              value={engineForm.name}
+              onChange={(e) => setEngineForm((p) => ({ ...p, name: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+            <TextField
+              label="Description"
+              size="small"
+              fullWidth
+              multiline
+              rows={2}
+              value={engineForm.description}
+              onChange={(e) => setEngineForm((p) => ({ ...p, description: e.target.value }))}
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' } }}
+            />
+            <TextField
+              label="Sort order"
+              size="small"
+              type="number"
+              value={engineForm.sort_order}
+              onChange={(e) => setEngineForm((p) => ({ ...p, sort_order: parseInt(e.target.value, 10) || 0 }))}
+              inputProps={{ min: 0 }}
+              helperText="Lower number = listed first"
+              sx={{ '& .MuiInputBase-root': { fontFamily: '"JetBrains Mono", monospace', fontSize: '0.82rem' } }}
+            />
+            <FormControlLabel
+              control={<Switch size="small" checked={engineForm.is_active} onChange={(e) => setEngineForm((p) => ({ ...p, is_active: e.target.checked }))} />}
+              label={<Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem' }}>Active (visible to users)</Typography>}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setEngineDialog(null)} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEngine}
+            disabled={engineLoading || !engineForm.name.trim()}
+            variant="contained"
+            startIcon={engineLoading ? <CircularProgress size={14} /> : <SaveIcon sx={{ fontSize: 15 }} />}
+            sx={{ bgcolor: 'primary.main', color: 'background.default', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}
+          >
+            {engineLoading ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Delete Engine dialog ──────────────────────────────────────────── */}
+      <Dialog open={Boolean(deleteEngDlg)} onClose={() => setDeleteEngDlg(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.3rem', color: 'text.primary', pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningAmberIcon sx={{ fontSize: 20, color: '#b45050' }} /> Delete engine?
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', color: 'text.secondary', lineHeight: 1.7 }}>
+            Remove <strong style={{ color: theme.palette.text.primary }}>{deleteEngDlg?.name}</strong>. Existing user configurations that reference this engine will have their engine field cleared.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button onClick={() => setDeleteEngDlg(null)} variant="outlined" startIcon={<CancelIcon sx={{ fontSize: 15 }} />} sx={{ color: 'text.secondary', borderColor: 'divider', fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteEngine} disabled={engineLoading} variant="contained" startIcon={engineLoading ? <CircularProgress size={14} /> : <DeleteIcon sx={{ fontSize: 15 }} />} sx={{ bgcolor: '#8f4a4a', '&:hover': { bgcolor: '#b45050' }, fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+            {engineLoading ? 'Deleting…' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

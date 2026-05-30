@@ -15,13 +15,14 @@ import DnsIcon        from '@mui/icons-material/Dns'
 import VpnLockIcon    from '@mui/icons-material/VpnLock'
 import { useAuth } from '../AuthContext'
 import { useThemeContext } from '../ThemeContext'
-import { listConfigs, createConfig, updateConfig, deleteConfig, testRetrieval, testPeoplesoft, testWindows, testVpn } from '../api'
+import { listConfigs, createConfig, updateConfig, deleteConfig, testRetrieval, testPeoplesoft, testWindows, testVpn, listEngines } from '../api'
 import WinServerBrowser from '../components/WinServerBrowser'
 
 const WIN_DEFAULT_PORTS = { winrm: '5985', smb: '445', ssh: '22' }
 
 const EMPTY = {
   name: '',
+  engine_id: '',
   ps_base_url: '', ps_auth_type: 'basic', ps_username: '', ps_password: '',
   ps_endpoint: '', ps_status_endpoint: '', ps_process_name: 'SM_DISCOVERY',
   retrieval_method: 'sftp',
@@ -118,6 +119,7 @@ export default function Settings() {
   const isDark = mode === 'dark'
 
   const [configs, setConfigs]               = useState([])
+  const [engines, setEngines]               = useState([])
   const [selectedConfigId, setSelectedConfigId] = useState(null)
   const [form, setForm]                     = useState(EMPTY)
   const [loading, setLoading]               = useState(false)
@@ -151,10 +153,11 @@ export default function Settings() {
   useEffect(() => {
     if (!token) return
     setLoading(true)
-    listConfigs(token)
-      .then((res) => {
-        setConfigs(res.data)
-        if (res.data.length) handleSelectConfig(res.data[0].id, res.data)
+    Promise.all([listConfigs(token), listEngines(token)])
+      .then(([cfgRes, engRes]) => {
+        setConfigs(cfgRes.data)
+        setEngines(engRes.data)
+        if (cfgRes.data.length) handleSelectConfig(cfgRes.data[0].id, cfgRes.data)
       })
       .catch(() => setError('Failed to load configurations.'))
       .finally(() => setLoading(false))
@@ -167,6 +170,7 @@ export default function Settings() {
     setSelectedConfigId(configId)
     setForm({
       name:               config.name || '',
+      engine_id:          config.engine_id || '',
       ps_base_url:        config.ps_base_url || '',
       ps_auth_type:       config.ps_auth_type || 'basic',
       ps_username:        config.ps_username || '',
@@ -320,6 +324,8 @@ export default function Settings() {
     const trimmed = Object.fromEntries(
       Object.entries(form).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
     )
+    // engine_id comes from Select as a number or empty string
+    trimmed.engine_id = form.engine_id ? Number(form.engine_id) : null
     try {
       if (selectedConfigId) {
         await updateConfig(selectedConfigId, trimmed, token)
@@ -431,6 +437,28 @@ export default function Settings() {
           <Field label="Configuration name">
             <TextField fullWidth size="small" value={form.name} onChange={set('name')} placeholder="e.g. Production HR, UAT Environment" sx={inputSx} />
           </Field>
+          <Box sx={{ gridColumn: '1 / -1' }}>
+            <Field label="Engine">
+              <FormControl fullWidth size="small">
+                <Select value={form.engine_id || ''} onChange={set('engine_id')} sx={selectSx} displayEmpty>
+                  <MenuItem value=""><em style={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.85rem', color: 'text.disabled' }}>— Select an engine —</em></MenuItem>
+                  {engines.map((e) => (
+                    <MenuItem key={e.id} value={e.id}>
+                      <Box>
+                        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.85rem' }}>{e.name}</Typography>
+                        {e.description && <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.65rem', color: 'text.disabled' }}>{e.description}</Typography>}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {engines.length === 0 && (
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.62rem', color: 'text.disabled', mt: 0.75 }}>
+                  No engines configured yet. Ask an admin to add engines in the Admin Console.
+                </Typography>
+              )}
+            </Field>
+          </Box>
         </Box>
       </Box>
 

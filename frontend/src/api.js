@@ -179,6 +179,13 @@ export function openWideEventStream(token, params = {}, handlers = {}) {
 export const getPreferences    = (token)          => client.get('/v2/preferences',  { headers: auth(token) })
 export const updatePreferences = (payload, token) => client.put('/v2/preferences', payload, { headers: auth(token) })
 
+// Engines (v2)
+export const listEngines       = (token)                => client.get('/v2/engines',                        { headers: auth(token) })
+export const listAdminEngines  = (token)                => client.get('/v2/admin/engines',                  { headers: auth(token) })
+export const createEngine      = (payload, token)       => client.post('/v2/admin/engines',        payload, { headers: auth(token) })
+export const updateEngine      = (id, payload, token)   => client.put(`/v2/admin/engines/${id}`,   payload, { headers: auth(token) })
+export const deleteEngine      = (id, token)            => client.delete(`/v2/admin/engines/${id}`,          { headers: auth(token) })
+
 // Feature Flags (v2)
 export const listFeatureFlags       = (token)            => client.get('/v2/feature-flags',                     { headers: auth(token) })
 export const listAdminFeatureFlags  = (token)            => client.get('/v2/admin/feature-flags',               { headers: auth(token) })
