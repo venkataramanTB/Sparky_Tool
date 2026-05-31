@@ -8,7 +8,6 @@ import { useTheme } from '@mui/material/styles'
 import { DataGrid } from '@mui/x-data-grid'
 import MythicsLogo from '../assets/MythicsLogo'
 import MythicsLoader from '../components/MythicsLoader'
-import mythicsLogoPng from '../assets/mythics-logo-color.png'
 import ViewToggle from '../components/ViewToggle'
 import { getDataGridSx } from '../utils/dataGridSx'
 import ContentCopyIcon        from '@mui/icons-material/ContentCopy'
@@ -31,7 +30,7 @@ import FunctionalDashboard  from './FunctionalDashboard'
 import OperationalDashboard from './OperationalDashboard'
 import AnalyzeDashboard     from './AnalyzeDashboard'
 import { useAuth } from '../AuthContext'
-import { listConfigs, listRuns, runConfig } from '../api'
+import { listConfigs, listRuns, runConfig, downloadRunPdf, downloadFunctionalPdf, downloadOperationalPdf } from '../api'
 
 // ── formatters ────────────────────────────────────────────────────────────────
 
@@ -159,7 +158,8 @@ export default function Dashboard() {
   const [dashTab,        setDashTab]        = useState(
     () => parseInt(localStorage.getItem('dashboard_tab') || '0', 10)
   )
-  const [pdfTabLoading,  setPdfTabLoading]  = useState(false)
+  const [pdfTabLoading,    setPdfTabLoading]    = useState(false)
+  const [functionalState,  setFunctionalState]  = useState(null) // {filename, data}
   const tabRef = useRef(null)
 
   const TAB_NAMES = ['Run Dashboard', 'Functional Dashboard', 'Operational Dashboard', 'AI Analysis']
@@ -177,124 +177,39 @@ export default function Dashboard() {
   const downloadTabPdf = useCallback(async () => {
     setPdfTabLoading(true)
     try {
-      const { jsPDF } = await import('jspdf')
-      const {
-        loadLogoBase64, extractRechartsImages,
-        drawPdfHeader, drawSectionHeading, drawDivider,
-        drawKpiCard, drawTable, drawChartBlock, addPageFooters,
-      } = await import('../utils/pdfUtils')
+      let blob, filename
 
-      const today = new Date().toLocaleDateString('en-US', {
-        year: 'numeric', month: 'long', day: 'numeric',
-      })
-      const pdf   = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
-      const pageW = pdf.internal.pageSize.getWidth()
-      const pageH = pdf.internal.pageSize.getHeight()
-      const M     = 40
-      const CW    = pageW - M * 2
-
-      const logo = await loadLogoBase64(mythicsLogoPng)
-
-      // ── TAB 0: Run Dashboard — fully programmatic from state ───────────────
       if (dashTab === 0) {
-        let y = drawPdfHeader(pdf, {
-          logo,
-          title: 'Run Dashboard',
-          metaLines: [
-            `Generated: ${today}`,
-            `${runs.length} total run${runs.length !== 1 ? 's' : ''} recorded`,
-          ],
-          pageW, margin: M,
-        })
+        // Run Dashboard — send KPI + runs to Python backend
+        blob     = await downloadRunPdf({ kpi, runs }, token)
+        filename = `sparky_run_dashboard_${new Date().toISOString().slice(0, 10)}.pdf`
 
-        // KPI boxes
-        y = drawSectionHeading(pdf, 'PERFORMANCE OVERVIEW', M, y)
-        const kpiW = (CW - 9) / 4
-        const KPI_ITEMS = [
-          { label: 'Total Runs',   value: kpi?.total ?? '—' },
-          { label: 'Success Rate', value: kpi?.rate != null ? `${kpi.rate}%` : '—' },
-          { label: 'Avg Duration', value: kpi?.avgMs != null ? fmtMs(kpi.avgMs) : '—' },
-          { label: 'Last Run',     value: kpi?.lastRun ? timeAgo(kpi.lastRun.started_at) : '—' },
-        ]
-        KPI_ITEMS.forEach(({ label, value }, i) => {
-          drawKpiCard(pdf, { label, value, x: M + i * (kpiW + 3), y, w: kpiW, h: 42 })
-        })
-        y += 56
-        y = drawDivider(pdf, M, y, CW)
+      } else if (dashTab === 1) {
+        // Functional Dashboard — send parsed CoreHR data to Python backend
+        if (!functionalState) throw new Error('No Functional Dashboard data loaded yet.')
+        blob     = await downloadFunctionalPdf(functionalState, token)
+        filename = `sparky_functional_${new Date().toISOString().slice(0, 10)}.pdf`
 
-        // Runs table
-        if (runs.length) {
-          y = drawSectionHeading(pdf, 'RECENT RUNS', M, y)
-          y = drawTable(pdf, {
-            headers:   ['Config', 'Instance ID', 'Report ID', 'Status', 'Rows', 'Duration', 'When'],
-            rows: runs.slice(0, 50).map((r) => [
-              r.config_name || '—',
-              r.instance_id || '—',
-              r.report_id   || '—',
-              r.status,
-              r.row_count != null ? r.row_count.toLocaleString() : '—',
-              fmtMs(r.duration_ms),
-              r.status === 'running' ? 'Running…' : timeAgo(r.started_at),
-            ]),
-            colWidths: [88, 98, 90, 55, 50, 58, 60],
-            x: M, y, pageH, margin: M,
-          })
-        }
-
-      // ── TABS 1, 2, 3 — header + recharts SVG extraction ────────────────────
-      } else {
-        let y = drawPdfHeader(pdf, {
-          logo,
-          title: TAB_NAMES[dashTab],
-          metaLines: [`Generated: ${today}`],
-          pageW, margin: M,
-        })
-
-        const chartImages = tabRef.current
-          ? await extractRechartsImages(tabRef.current, '#ffffff')
-          : []
-
-        if (!chartImages.length) {
-          pdf.setFont('helvetica', 'normal')
-          pdf.setFontSize(9)
-          pdf.setTextColor(150, 150, 150)
-          pdf.text('No charts available on this tab.', M, y + 20)
-        } else {
-          y = drawSectionHeading(pdf, 'CHARTS', M, y)
-          const GAP    = 12
-          const SLOT_W = (CW - GAP) / 2
-          const MAX_CH = 190
-
-          for (let i = 0; i < chartImages.length; i++) {
-            const col  = i % 2
-            const img  = chartImages[i]
-            const imgH = img ? Math.min(SLOT_W * (img.h / img.w), MAX_CH) : 120
-            const bH   = 16 + imgH + 24
-
-            if (col === 0 && y + bH > pageH - M - 20) {
-              pdf.addPage()
-              y = M + 8
-            }
-            drawChartBlock(pdf, {
-              img,
-              title: `Chart ${i + 1}`,
-              x: M + col * (SLOT_W + GAP),
-              y, w: SLOT_W, maxH: MAX_CH,
-            })
-            if (col === 1 || i === chartImages.length - 1) y += bH + GAP
-          }
-        }
+      } else if (dashTab === 2) {
+        // Operational Dashboard — send run list to Python backend
+        blob     = await downloadOperationalPdf({ runs }, token)
+        filename = `sparky_operational_${new Date().toISOString().slice(0, 10)}.pdf`
       }
 
-      addPageFooters(pdf, pageW, pageH, M)
-      const slug = TAB_NAMES[dashTab].toLowerCase().replace(/\s+/g, '_')
-      pdf.save(`sparky_${slug}_${new Date().toISOString().slice(0, 10)}.pdf`)
+      if (blob) {
+        const url = URL.createObjectURL(blob)
+        const a   = document.createElement('a')
+        a.href     = url
+        a.download = filename
+        a.click()
+        URL.revokeObjectURL(url)
+      }
     } catch (err) {
       console.error('PDF generation failed', err)
     } finally {
       setPdfTabLoading(false)
     }
-  }, [dashTab, kpi, runs])
+  }, [dashTab, kpi, runs, functionalState, token])
 
   const selectedConfig = useMemo(
     () => configs.find((c) => c.id === activeConfigId) || null,
@@ -482,27 +397,29 @@ export default function Dashboard() {
             <Tab label="Analyse"     />
           </Tabs>
 
-          {/* Universal PDF download — works for all four tabs */}
-          <Tooltip title={`Download ${TAB_NAMES[dashTab]} as PDF`} arrow placement="left">
-            <span>
-              <IconButton
-                onClick={downloadTabPdf}
-                disabled={pdfTabLoading || pageLoading}
-                size="small"
-                sx={{
-                  mr: 0.5,
-                  color: pdfTabLoading ? 'text.disabled' : 'text.secondary',
-                  '&:hover': { color: accent, bgcolor: `${accent}12` },
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {pdfTabLoading
-                  ? <CircularProgress size={14} sx={{ color: accent }} />
-                  : <PictureAsPdfIcon sx={{ fontSize: 18 }} />
-                }
-              </IconButton>
-            </span>
-          </Tooltip>
+          {/* PDF download button — hidden on the AI Analysis tab (it has its own) */}
+          {dashTab !== 3 && (
+            <Tooltip title={`Download ${TAB_NAMES[dashTab]} as PDF`} arrow placement="left">
+              <span>
+                <IconButton
+                  onClick={downloadTabPdf}
+                  disabled={pdfTabLoading || pageLoading}
+                  size="small"
+                  sx={{
+                    mr: 0.5,
+                    color: pdfTabLoading ? 'text.disabled' : 'text.secondary',
+                    '&:hover': { color: accent, bgcolor: `${accent}12` },
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {pdfTabLoading
+                    ? <CircularProgress size={14} sx={{ color: accent }} />
+                    : <PictureAsPdfIcon sx={{ fontSize: 18 }} />
+                  }
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
         </Box>
 
         {/* ── Tab panels ────────────────────────────────────────────────────── */}
@@ -772,7 +689,7 @@ export default function Dashboard() {
           </Box>
         )}
 
-        {dashTab === 1 && <Box ref={tabRef}><FunctionalDashboard /></Box>}
+        {dashTab === 1 && <Box ref={tabRef}><FunctionalDashboard onDataChange={setFunctionalState} /></Box>}
         {dashTab === 2 && <Box ref={tabRef}><OperationalDashboard /></Box>}
         {dashTab === 3 && <Box ref={tabRef}><AnalyzeDashboard /></Box>}
 

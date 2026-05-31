@@ -8,6 +8,8 @@ import httpx
 import pandas as pd
 import google.generativeai as genai
 from fastapi import APIRouter, Depends, File, Query, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth import get_current_user
@@ -18,6 +20,10 @@ import anthropic as _anthropic_sdk
 from models import User, UserConfig, AiModel
 from logger import get_logger
 from pii_masker import PIIMasker
+from pdf_generator import (
+    generate_analysis_pdf, generate_run_pdf,
+    generate_functional_pdf, generate_operational_pdf,
+)
 
 log = get_logger("insights")
 router = APIRouter(prefix="/api/v2/insights", tags=["insights"])
@@ -600,3 +606,113 @@ async def analyze_file(
         user.id[:8], len(chart_spec.get("charts", [])), prompt_tokens + completion_tokens,
     )
     return chart_spec
+
+
+# ── PDF generation endpoints ──────────────────────────────────────────────────
+
+class AnalysisPdfRequest(BaseModel):
+    filename: str = "report"
+    summary:  str = ""
+    charts:   list[dict] = []
+    meta:     dict = {}
+
+
+class RunPdfRequest(BaseModel):
+    kpi:  dict | None = None
+    runs: list[dict] = []
+
+
+class FunctionalPdfRequest(BaseModel):
+    filename: str = 'report'
+    data:     dict = {}
+
+
+class OperationalPdfRequest(BaseModel):
+    runs: list[dict] = []
+
+
+@router.post("/generate-pdf")
+def generate_pdf(
+    body: AnalysisPdfRequest,
+    user: User = Depends(get_current_user),
+):
+    """Generate a professional AI Analysis PDF (matplotlib charts + ReportLab layout)."""
+    log.info("generate_pdf  user=%s  charts=%d", user.id[:8], len(body.charts))
+    try:
+        pdf_bytes = generate_analysis_pdf(
+            filename=body.filename,
+            summary=body.summary,
+            charts=body.charts,
+            meta=body.meta,
+        )
+    except Exception as exc:
+        log.error("generate_pdf failed  user=%s  error=%s", user.id[:8], exc)
+        raise HTTPException(500, f"PDF generation failed: {exc}") from exc
+
+    safe = (body.filename or "report").rsplit(".", 1)[0].replace(" ", "_")
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe}_analysis.pdf"'},
+    )
+
+
+@router.post("/generate-run-pdf")
+def generate_run_pdf_endpoint(
+    body: RunPdfRequest,
+    user: User = Depends(get_current_user),
+):
+    """Generate a Run Dashboard PDF (KPI summary + styled runs table)."""
+    log.info("generate_run_pdf  user=%s  runs=%d", user.id[:8], len(body.runs))
+    try:
+        pdf_bytes = generate_run_pdf(kpi=body.kpi, runs=body.runs)
+    except Exception as exc:
+        log.error("generate_run_pdf failed  user=%s  error=%s", user.id[:8], exc)
+        raise HTTPException(500, f"PDF generation failed: {exc}") from exc
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="run_dashboard.pdf"'},
+    )
+
+
+@router.post("/generate-functional-pdf")
+def generate_functional_pdf_endpoint(
+    body: FunctionalPdfRequest,
+    user: User = Depends(get_current_user),
+):
+    """Generate a Functional Dashboard PDF (module adoption charts + module table)."""
+    log.info("generate_functional_pdf  user=%s  file=%s", user.id[:8], body.filename)
+    try:
+        pdf_bytes = generate_functional_pdf(filename=body.filename, data=body.data)
+    except Exception as exc:
+        log.error("generate_functional_pdf failed  user=%s  error=%s", user.id[:8], exc)
+        raise HTTPException(500, f"PDF generation failed: {exc}") from exc
+
+    safe = (body.filename or 'functional').rsplit('.', 1)[0].replace(' ', '_')
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe}_functional.pdf"'},
+    )
+
+
+@router.post("/generate-operational-pdf")
+def generate_operational_pdf_endpoint(
+    body: OperationalPdfRequest,
+    user: User = Depends(get_current_user),
+):
+    """Generate an Operational Dashboard PDF (run KPIs + charts + recent runs table)."""
+    log.info("generate_operational_pdf  user=%s  runs=%d", user.id[:8], len(body.runs))
+    try:
+        pdf_bytes = generate_operational_pdf(runs=body.runs)
+    except Exception as exc:
+        log.error("generate_operational_pdf failed  user=%s  error=%s", user.id[:8], exc)
+        raise HTTPException(500, f"PDF generation failed: {exc}") from exc
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="operational_dashboard.pdf"'},
+    )

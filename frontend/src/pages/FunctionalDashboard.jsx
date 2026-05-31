@@ -432,7 +432,7 @@ function dark(theme) { return theme.palette.mode === 'dark' }
 // FunctionalDashboard
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export default function FunctionalDashboard() {
+export default function FunctionalDashboard({ onDataChange }) {
   const { token } = useAuth()
   const theme     = useTheme()
   const accent    = theme.palette.primary.main
@@ -470,6 +470,11 @@ export default function FunctionalDashboard() {
       .catch(() => setError(`Could not parse ${selectedFile}`))
       .finally(() => setLoadingData(false))
   }, [token, selectedFile])
+
+  // ── notify parent so it can generate backend PDF ───────────────────────────
+  useEffect(() => {
+    if (data && selectedFile) onDataChange?.({ filename: selectedFile, data })
+  }, [data, selectedFile])
 
   // ── derived KPI ────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
