@@ -176,14 +176,14 @@ try:
             sftp_username=config.sftp_username or "",
             sftp_password=decrypt(config.sftp_password_enc),
             sftp_remote_path=config.sftp_remote_path or "",
-            # VPN tunnel
-            vpn_enabled=config.vpn_enabled or False,
-            vpn_type=config.vpn_type or "none",
-            vpn_host=config.vpn_host or "",
-            vpn_port=config.vpn_port,
-            vpn_username=config.vpn_username or "",
-            vpn_password=decrypt(config.vpn_password_enc) if config.vpn_password_enc else "",
-            vpn_extra=config.vpn_extra or "",
+            # FTP / FTPS
+            ftp_host=config.ftp_host or "",
+            ftp_port=config.ftp_port or 21,
+            ftp_username=config.ftp_username or "",
+            ftp_password=decrypt(config.ftp_password_enc) if config.ftp_password_enc else "",
+            ftp_remote_path=config.ftp_remote_path or "",
+            ftp_connection_type=config.ftp_connection_type or "ftp",
+            ftp_passive=config.ftp_passive if config.ftp_passive is not None else True,
             # Windows Server (WinRM) retrieval
             win_host=config.win_host or "",
             win_port=config.win_port or 5985,
@@ -304,18 +304,7 @@ try:
                 remote_path = remote_path.replace("{instance_id}", instance_id)
 
             t3 = _time.time()
-            _vpn_ctx = None
-            _is_windows_method = s_eng.retrieval_method in ("winrm", "smb", "win_ssh")
             try:
-                if _is_windows_method and getattr(s_eng, "vpn_enabled", False):
-                    try:
-                        import vpn_client as _vpn
-                        _vpn_ctx = _vpn.vpn_connect(s_eng)
-                        log.info("Run %d  VPN connected  type=%s", run_log.id, s_eng.vpn_type)
-                    except Exception as vpn_exc:
-                        run_log.failed_step = "vpn"
-                        raise HTTPException(503, f"VPN connection failed: {vpn_exc}")
-
                 if s_eng.retrieval_method == "scp":
                     csv_bytes = scp_client.download_csv(remote_path=remote_path, _settings=s_eng)
                 elif s_eng.retrieval_method == "winrm":
@@ -327,22 +316,18 @@ try:
                 elif s_eng.retrieval_method == "win_ssh":
                     import win_ssh_client as _winssh
                     csv_bytes = _winssh.download_csv(remote_path=remote_path, _settings=s_eng)
+                elif s_eng.retrieval_method == "ftp":
+                    import ftp_client as _ftpcli
+                    csv_bytes = _ftpcli.download_csv(remote_path=remote_path, _settings=s_eng)
                 else:
                     csv_bytes = sftp_client.download_csv(remote_path=remote_path, _settings=s_eng)
             except Exception as exc:
-                label = {"scp": "SSH/SCP", "winrm": "WinRM", "smb": "SMB", "win_ssh": "SSH"}.get(
+                label = {"scp": "SSH/SCP", "winrm": "WinRM", "smb": "SMB", "win_ssh": "SSH", "ftp": "FTP"}.get(
                     s_eng.retrieval_method, "SFTP"
                 )
                 if not isinstance(exc, HTTPException):
                     run_log.failed_step = "download"
                 raise exc if isinstance(exc, HTTPException) else HTTPException(503, f"{label} download error: {exc}")
-            finally:
-                if _vpn_ctx is not None:
-                    try:
-                        import vpn_client as _vpn
-                        _vpn.vpn_disconnect(_vpn_ctx)
-                    except Exception as vpn_disc_exc:
-                        log.warning("Run %d  VPN disconnect error: %s", run_log.id, vpn_disc_exc)
             log.info("Run %d  step=download  size=%d bytes  %d ms",
                      run_log.id, len(csv_bytes), round((_time.time() - t3) * 1000))
 
@@ -796,40 +781,6 @@ def test_retrieval(body: RetrievalTestPayload):
 
 # ── Windows Server (WinRM) endpoints ──────────────────────────────────────────
 
-class VpnTestPayload(BaseModel):
-    vpn_type: str = "none"
-    vpn_host: str = ""
-    vpn_port: int | None = None
-    vpn_username: str = ""
-    vpn_password: str = ""
-    vpn_extra: str = ""
-
-
-@app.post("/api/test-vpn")
-def test_vpn(body: VpnTestPayload):
-    from types import SimpleNamespace
-    s = SimpleNamespace(
-        vpn_enabled=True,
-        vpn_type=body.vpn_type,
-        vpn_host=body.vpn_host,
-        vpn_port=body.vpn_port,
-        vpn_username=body.vpn_username,
-        vpn_password=body.vpn_password,
-        vpn_extra=body.vpn_extra,
-    )
-    log.info("test_vpn  type=%s  host=%s", body.vpn_type, body.vpn_host)
-    try:
-        import vpn_client as _vpn
-        result = _vpn.vpn_test(s)
-        if result["ok"]:
-            return {"status": "ok", "vpn_type": body.vpn_type}
-        raise HTTPException(400, result.get("error", "VPN test failed"))
-    except HTTPException:
-        raise
-    except Exception as exc:
-        log.warning("test_vpn error: %s", exc)
-        raise HTTPException(400, str(exc))
-
 
 class WinPayload(BaseModel):
     win_host: str
@@ -1059,6 +1010,76 @@ def _win_error_msg(raw: str, connection_type: str, host: str, port: int) -> str:
     if connection_type == "ssh":
         return _ssh_error_msg(raw, host, port)
     return _winrm_error_msg(raw, host, port)
+
+
+# ── FTP / FTPS endpoints ──────────────────────────────────────────────────────
+
+class FtpPayload(BaseModel):
+    ftp_host: str
+    ftp_port: int = 21
+    ftp_username: str = ""
+    ftp_password: str = ""
+    ftp_connection_type: str = "ftp"   # ftp | ftps
+    ftp_passive: bool = True
+
+
+class FtpBrowsePayload(FtpPayload):
+    path: str
+
+
+class FtpReadFilePayload(FtpPayload):
+    path: str
+
+
+@app.post("/api/test-ftp")
+def test_ftp(body: FtpPayload):
+    import ftp_client as _ftp
+    tls = body.ftp_connection_type == "ftps"
+    log.info("test_ftp  %s:%d  user=%s  tls=%s", body.ftp_host, body.ftp_port, body.ftp_username, tls)
+    try:
+        info = _ftp.test_connection(
+            body.ftp_host, body.ftp_port,
+            body.ftp_username, body.ftp_password,
+            tls=tls, passive=body.ftp_passive,
+        )
+        return {"status": "ok", **info}
+    except Exception as exc:
+        log.warning("test_ftp failed  %s: %s", body.ftp_host, exc)
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/ftp-browse")
+def ftp_browse(body: FtpBrowsePayload):
+    import ftp_client as _ftp
+    tls = body.ftp_connection_type == "ftps"
+    log.info("ftp_browse  %s  path=%s  tls=%s", body.ftp_host, body.path, tls)
+    try:
+        items = _ftp.list_directory(
+            body.ftp_host, body.ftp_port,
+            body.ftp_username, body.ftp_password,
+            body.path, tls=tls, passive=body.ftp_passive,
+        )
+        return {"path": body.path, "items": items}
+    except Exception as exc:
+        log.warning("ftp_browse failed  %s  path=%s: %s", body.ftp_host, body.path, exc)
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/ftp-read-file")
+def ftp_read_file(body: FtpReadFilePayload):
+    import ftp_client as _ftp
+    tls = body.ftp_connection_type == "ftps"
+    log.info("ftp_read_file  %s  path=%s  tls=%s", body.ftp_host, body.path, tls)
+    try:
+        content = _ftp.read_file(
+            body.ftp_host, body.ftp_port,
+            body.ftp_username, body.ftp_password,
+            body.path, tls=tls, passive=body.ftp_passive,
+        )
+        return {"path": body.path, "content": content}
+    except Exception as exc:
+        log.warning("ftp_read_file failed  %s  path=%s: %s", body.ftp_host, body.path, exc)
+        raise HTTPException(400, str(exc))
 
 
 @app.post("/api/settings")

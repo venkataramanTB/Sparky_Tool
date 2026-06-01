@@ -30,14 +30,14 @@ class ConfigPayload(BaseModel):
     sftp_password: str = ""      # plain — encrypted before storage
     sftp_remote_path: str = ""
     ps_webserver_path: str = ""
-    # VPN tunnel
-    vpn_enabled: bool = False
-    vpn_type: str = "none"
-    vpn_host: str = ""
-    vpn_port: int | None = None
-    vpn_username: str = ""
-    vpn_password: str = ""
-    vpn_extra: str = ""
+    # FTP / FTPS server access
+    ftp_host: str = ""
+    ftp_port: int = 21
+    ftp_username: str = ""
+    ftp_password: str = ""
+    ftp_remote_path: str = ""
+    ftp_connection_type: str = "ftp"
+    ftp_passive: bool = True
     # Windows Server access
     win_host: str = ""
     win_port: int = 5985
@@ -92,13 +92,13 @@ def _serialize(config: UserConfig, db: Session) -> dict:
         "sftp_password":      "***" if config.sftp_password_enc else "",
         "sftp_remote_path":   config.sftp_remote_path,
         "ps_webserver_path":  config.ps_webserver_path,
-        "vpn_enabled":        config.vpn_enabled or False,
-        "vpn_type":           config.vpn_type or "none",
-        "vpn_host":           config.vpn_host or "",
-        "vpn_port":           config.vpn_port,
-        "vpn_username":       config.vpn_username or "",
-        "vpn_password":       "***" if config.vpn_password_enc else "",
-        "vpn_extra":          config.vpn_extra or "",
+        "ftp_host":            config.ftp_host or "",
+        "ftp_port":            config.ftp_port or 21,
+        "ftp_username":        config.ftp_username or "",
+        "ftp_password":        "***" if config.ftp_password_enc else "",
+        "ftp_remote_path":     config.ftp_remote_path or "",
+        "ftp_connection_type": config.ftp_connection_type or "ftp",
+        "ftp_passive":         config.ftp_passive if config.ftp_passive is not None else True,
         "win_host":           config.win_host,
         "win_port":           config.win_port,
         "win_username":       config.win_username,
@@ -146,13 +146,13 @@ def create_config(
         sftp_password_enc=encrypt(body.sftp_password) if body.sftp_password else "",
         sftp_remote_path=body.sftp_remote_path,
         ps_webserver_path=body.ps_webserver_path,
-        vpn_enabled=body.vpn_enabled,
-        vpn_type=body.vpn_type,
-        vpn_host=body.vpn_host,
-        vpn_port=body.vpn_port,
-        vpn_username=body.vpn_username,
-        vpn_password_enc=encrypt(body.vpn_password) if body.vpn_password else "",
-        vpn_extra=body.vpn_extra,
+        ftp_host=body.ftp_host,
+        ftp_port=body.ftp_port,
+        ftp_username=body.ftp_username,
+        ftp_password_enc=encrypt(body.ftp_password) if body.ftp_password else "",
+        ftp_remote_path=body.ftp_remote_path,
+        ftp_connection_type=body.ftp_connection_type,
+        ftp_passive=body.ftp_passive,
         win_host=body.win_host,
         win_port=body.win_port,
         win_username=body.win_username,
@@ -217,12 +217,12 @@ def update_config(
     config.sftp_username      = body.sftp_username
     config.sftp_remote_path   = body.sftp_remote_path
     config.ps_webserver_path  = body.ps_webserver_path
-    config.vpn_enabled        = body.vpn_enabled
-    config.vpn_type           = body.vpn_type
-    config.vpn_host           = body.vpn_host
-    config.vpn_port           = body.vpn_port
-    config.vpn_username       = body.vpn_username
-    config.vpn_extra          = body.vpn_extra
+    config.ftp_host            = body.ftp_host
+    config.ftp_port            = body.ftp_port
+    config.ftp_username        = body.ftp_username
+    config.ftp_remote_path     = body.ftp_remote_path
+    config.ftp_connection_type = body.ftp_connection_type
+    config.ftp_passive         = body.ftp_passive
     config.win_host           = body.win_host
     config.win_port           = body.win_port
     config.win_username       = body.win_username
@@ -237,8 +237,8 @@ def update_config(
         config.ps_password_enc = encrypt(body.ps_password)
     if body.sftp_password and body.sftp_password != "***":
         config.sftp_password_enc = encrypt(body.sftp_password)
-    if body.vpn_password and body.vpn_password != "***":
-        config.vpn_password_enc = encrypt(body.vpn_password)
+    if body.ftp_password and body.ftp_password != "***":
+        config.ftp_password_enc = encrypt(body.ftp_password)
     if body.win_password and body.win_password != "***":
         config.win_password_enc = encrypt(body.win_password)
 
