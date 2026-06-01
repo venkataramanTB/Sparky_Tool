@@ -19,6 +19,7 @@ import { listConfigs, createConfig, updateConfig, deleteConfig, testRetrieval, t
 import WinServerBrowser from '../components/WinServerBrowser'
 import FtpBrowser from '../components/FtpBrowser'
 import MythicsLoader from '../components/MythicsLoader'
+import SuccessCheck from '../components/SuccessCheck'
 
 const WIN_DEFAULT_PORTS = { winrm: '5985', smb: '445', ssh: '22' }
 const FTP_DEFAULT_PORTS = { ftp: '21', ftps: '21' }
@@ -363,14 +364,18 @@ export default function Settings() {
   // Shared result box
   const ResultBox = ({ status }) => status && status !== 'testing' && (
     <Box sx={{
-      display: 'flex', alignItems: 'flex-start', gap: 1.5,
-      px: 2, py: 1.2, borderRadius: '3px', flex: 1, minWidth: 0,
+      display: 'flex', alignItems: 'center', gap: 1.5,
+      px: status.ok ? 1.2 : 2, py: status.ok ? 0.6 : 1.2,
+      borderRadius: '3px', flex: 1, minWidth: 0,
       border: status.ok ? '1px solid rgba(107,143,113,0.3)' : '1px solid rgba(143,74,74,0.3)',
-      bgcolor: status.ok ? 'rgba(107,143,113,0.06)' : 'rgba(143,74,74,0.06)',
+      bgcolor: status.ok ? 'rgba(107,143,113,0.05)' : 'rgba(143,74,74,0.06)',
       '@keyframes resultIn': { from: { opacity: 0, transform: 'translateX(-6px)' }, to: { opacity: 1, transform: 'none' } },
       animation: 'resultIn 0.25s ease both',
     }}>
-      <Box sx={{ width: 6, height: 6, borderRadius: '50%', mt: 0.35, flexShrink: 0, bgcolor: status.ok ? '#6b8f71' : '#8f4a4a', boxShadow: status.ok ? '0 0 6px rgba(107,143,113,0.6)' : '0 0 6px rgba(143,74,74,0.6)' }} />
+      {status.ok
+        ? <SuccessCheck size={44} color="#6b8f71" />
+        : <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, bgcolor: '#8f4a4a', boxShadow: '0 0 6px rgba(143,74,74,0.6)' }} />
+      }
       <Box sx={{ minWidth: 0 }}>{status.children}</Box>
     </Box>
   )
@@ -573,13 +578,18 @@ export default function Settings() {
             </Button>
             {psTestStatus && psTestStatus !== 'testing' && (
               <Box sx={{
-                display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.2, borderRadius: '3px', flex: 1, minWidth: 0,
+                display: 'flex', alignItems: 'center', gap: 1.5,
+                px: psTestStatus.ok ? 1.2 : 2, py: psTestStatus.ok ? 0.5 : 1.2,
+                borderRadius: '3px', flex: 1, minWidth: 0,
                 border: psTestStatus.ok ? '1px solid rgba(107,143,113,0.3)' : '1px solid rgba(143,74,74,0.3)',
-                bgcolor: psTestStatus.ok ? 'rgba(107,143,113,0.06)' : 'rgba(143,74,74,0.06)',
+                bgcolor: psTestStatus.ok ? 'rgba(107,143,113,0.05)' : 'rgba(143,74,74,0.06)',
                 '@keyframes resultIn': { from: { opacity: 0, transform: 'translateX(-6px)' }, to: { opacity: 1, transform: 'none' } },
                 animation: 'resultIn 0.25s ease both',
               }}>
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', mt: 0.35, flexShrink: 0, bgcolor: psTestStatus.ok ? '#6b8f71' : '#8f4a4a', boxShadow: psTestStatus.ok ? '0 0 6px rgba(107,143,113,0.6)' : '0 0 6px rgba(143,74,74,0.6)' }} />
+                {psTestStatus.ok
+                  ? <SuccessCheck size={44} color="#6b8f71" />
+                  : <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, bgcolor: '#8f4a4a', boxShadow: '0 0 6px rgba(143,74,74,0.6)' }} />
+                }
                 <Box>
                   {psTestStatus.ok ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
@@ -679,13 +689,18 @@ export default function Settings() {
               </Button>
               {testStatus && testStatus !== 'testing' && (
                 <Box sx={{
-                  display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.2, borderRadius: '3px', flex: 1, minWidth: 0,
+                  display: 'flex', alignItems: 'center', gap: 1.5,
+                  px: testStatus.ok ? 1.2 : 2, py: testStatus.ok ? 0.5 : 1.2,
+                  borderRadius: '3px', flex: 1, minWidth: 0,
                   border: testStatus.ok ? '1px solid rgba(107,143,113,0.3)' : '1px solid rgba(143,74,74,0.3)',
-                  bgcolor: testStatus.ok ? 'rgba(107,143,113,0.06)' : 'rgba(143,74,74,0.06)',
+                  bgcolor: testStatus.ok ? 'rgba(107,143,113,0.05)' : 'rgba(143,74,74,0.06)',
                   '@keyframes resultIn': { from: { opacity: 0, transform: 'translateX(-6px)' }, to: { opacity: 1, transform: 'none' } },
                   animation: 'resultIn 0.25s ease both',
                 }}>
-                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', mt: 0.35, flexShrink: 0, bgcolor: testStatus.ok ? '#6b8f71' : '#8f4a4a', boxShadow: testStatus.ok ? '0 0 6px rgba(107,143,113,0.6)' : '0 0 6px rgba(143,74,74,0.6)' }} />
+                  {testStatus.ok
+                    ? <SuccessCheck size={44} color="#6b8f71" />
+                    : <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, bgcolor: '#8f4a4a', boxShadow: '0 0 6px rgba(143,74,74,0.6)' }} />
+                  }
                   <Box>
                     {testStatus.ok ? (<>
                       <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', color: '#8fc99a', letterSpacing: '0.06em', mb: 0.2 }}>Connection successful</Typography>
@@ -828,13 +843,18 @@ export default function Settings() {
 
             {winTestStatus && winTestStatus !== 'testing' && (
               <Box sx={{
-                display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.2, borderRadius: '3px', flex: 1, minWidth: 0,
+                display: 'flex', alignItems: 'center', gap: 1.5,
+                px: winTestStatus.ok ? 1.2 : 2, py: winTestStatus.ok ? 0.5 : 1.2,
+                borderRadius: '3px', flex: 1, minWidth: 0,
                 border: winTestStatus.ok ? '1px solid rgba(107,143,113,0.3)' : '1px solid rgba(143,74,74,0.3)',
-                bgcolor: winTestStatus.ok ? 'rgba(107,143,113,0.06)' : 'rgba(143,74,74,0.06)',
+                bgcolor: winTestStatus.ok ? 'rgba(107,143,113,0.05)' : 'rgba(143,74,74,0.06)',
                 '@keyframes resultIn': { from: { opacity: 0, transform: 'translateX(-6px)' }, to: { opacity: 1, transform: 'none' } },
                 animation: 'resultIn 0.25s ease both',
               }}>
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', mt: 0.35, flexShrink: 0, bgcolor: winTestStatus.ok ? '#6b8f71' : '#8f4a4a', boxShadow: winTestStatus.ok ? '0 0 6px rgba(107,143,113,0.6)' : '0 0 6px rgba(143,74,74,0.6)' }} />
+                {winTestStatus.ok
+                  ? <SuccessCheck size={44} color="#6b8f71" />
+                  : <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, bgcolor: '#8f4a4a', boxShadow: '0 0 6px rgba(143,74,74,0.6)' }} />
+                }
                 <Box>
                   {winTestStatus.ok ? (
                     <Box>
@@ -926,13 +946,18 @@ export default function Settings() {
 
             {ftpTestStatus && ftpTestStatus !== 'testing' && (
               <Box sx={{
-                display: 'flex', alignItems: 'flex-start', gap: 1.5, px: 2, py: 1.2, borderRadius: '3px', flex: 1, minWidth: 0,
+                display: 'flex', alignItems: 'center', gap: 1.5,
+                px: ftpTestStatus.ok ? 1.2 : 2, py: ftpTestStatus.ok ? 0.5 : 1.2,
+                borderRadius: '3px', flex: 1, minWidth: 0,
                 border: ftpTestStatus.ok ? '1px solid rgba(107,143,113,0.3)' : '1px solid rgba(143,74,74,0.3)',
-                bgcolor: ftpTestStatus.ok ? 'rgba(107,143,113,0.06)' : 'rgba(143,74,74,0.06)',
+                bgcolor: ftpTestStatus.ok ? 'rgba(107,143,113,0.05)' : 'rgba(143,74,74,0.06)',
                 '@keyframes resultIn': { from: { opacity: 0, transform: 'translateX(-6px)' }, to: { opacity: 1, transform: 'none' } },
                 animation: 'resultIn 0.25s ease both',
               }}>
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', mt: 0.35, flexShrink: 0, bgcolor: ftpTestStatus.ok ? '#6b8f71' : '#8f4a4a', boxShadow: ftpTestStatus.ok ? '0 0 6px rgba(107,143,113,0.6)' : '0 0 6px rgba(143,74,74,0.6)' }} />
+                {ftpTestStatus.ok
+                  ? <SuccessCheck size={44} color="#6b8f71" />
+                  : <Box sx={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, bgcolor: '#8f4a4a', boxShadow: '0 0 6px rgba(143,74,74,0.6)' }} />
+                }
                 <Box>
                   {ftpTestStatus.ok ? (
                     <Box>
@@ -987,9 +1012,18 @@ export default function Settings() {
           </Alert>
         )}
         {success && (
-          <Alert severity="success" sx={{ flex: 1, minWidth: 0, py: 0.5, bgcolor: 'rgba(107,143,113,0.1)', border: '1px solid rgba(107,143,113,0.3)', color: isDark ? '#8fc99a' : '#4a7a50', borderRadius: '3px', '& .MuiAlert-icon': { color: '#6b8f71' } }}>
-            Configuration saved successfully.
-          </Alert>
+          <Box sx={{
+            display: 'flex', alignItems: 'center', gap: 1,
+            px: 1.2, py: 0.4,
+            bgcolor: 'rgba(107,143,113,0.06)', border: '1px solid rgba(107,143,113,0.3)', borderRadius: '3px',
+            '@keyframes savedIn': { from: { opacity: 0, transform: 'scale(0.94)' }, to: { opacity: 1, transform: 'scale(1)' } },
+            animation: 'savedIn 0.2s ease both',
+          }}>
+            <SuccessCheck size={40} color="#6b8f71" />
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', color: isDark ? '#8fc99a' : '#4a7a50', letterSpacing: '0.04em' }}>
+              Saved
+            </Typography>
+          </Box>
         )}
         <Button onClick={handleSave} disabled={saving}
           startIcon={saving ? <CircularProgress size={14} sx={{ color: isDark ? '#0b0c0e' : '#ffffff' }} /> : <SaveIcon sx={{ fontSize: 16 }} />}
