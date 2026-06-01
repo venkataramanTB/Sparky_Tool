@@ -21,6 +21,7 @@ import TableChartIcon    from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon  from '@mui/icons-material/PictureAsPdf'
 import { analyzeFile, listInsightModels, downloadAnalysisPdf } from '../api'
 import MythicsLoader from '../components/MythicsLoader'
+import SuccessCheck from '../components/SuccessCheck'
 
 // ── colour palette (matches backend prompt) ────────────────────────────────────
 const PALETTE = ['#6b8f71','#6495b4','#c9a84c','#b45050','#9b59b6','#e67e22','#1abc9c','#e74c3c']
@@ -362,6 +363,8 @@ export default function AnalyzeDashboard() {
   const chartsRef = useRef(null)
   const [loading,         setLoading]         = useState(false)
   const [pdfLoading,      setPdfLoading]      = useState(false)
+  const [showSuccess,     setShowSuccess]     = useState(false)
+  const [pdfSuccess,      setPdfSuccess]      = useState(false)
   const [error,           setError]           = useState(null)
   const [result,          setResult]          = useState(null)
   const [filename,        setFilename]        = useState('')
@@ -387,6 +390,8 @@ export default function AnalyzeDashboard() {
     try {
       const { data } = await analyzeFile(file, selectedModelId)
       setResult(data)
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 1600)
     } catch (err) {
       setError(err?.response?.data?.detail || err.message || 'Analysis failed — check the server logs.')
     } finally {
@@ -410,6 +415,8 @@ export default function AnalyzeDashboard() {
       a.download = `${(filename || 'report').replace(/\.[^.]+$/, '')}_analysis.pdf`
       a.click()
       URL.revokeObjectURL(url)
+      setPdfSuccess(true)
+      setTimeout(() => setPdfSuccess(false), 2200)
     } catch (err) {
       console.error('PDF download failed', err)
     } finally {
@@ -488,11 +495,55 @@ export default function AnalyzeDashboard() {
         </Alert>
       )}
 
+      {/* ── success splash (brief, auto-dismisses before charts appear) ──── */}
+      {result && showSuccess && (
+        <Box sx={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', py: 8, gap: 2.5,
+          '@keyframes splashIn': { from: { opacity: 0, transform: 'scale(0.92)' }, to: { opacity: 1, transform: 'scale(1)' } },
+          animation: 'splashIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both',
+        }}>
+          <SuccessCheck size={96} color="#6b8f71" />
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography sx={{
+              fontFamily: '"Cormorant Garamond", serif', fontSize: '1.55rem',
+              fontWeight: 700, color: 'text.primary', letterSpacing: '0.02em', mb: 0.5,
+            }}>
+              Analysis complete
+            </Typography>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', color: 'text.secondary' }}>
+              {(result.charts || []).length} chart{(result.charts || []).length !== 1 ? 's' : ''} generated from{' '}
+              <Box component="span" sx={{ color: accent }}>{filename}</Box>
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
       {/* ── results ───────────────────────────────────────────────────────── */}
-      {result && (
-        <Box>
+      {result && !showSuccess && (
+        <Box sx={{
+          '@keyframes chartsIn': { from: { opacity: 0, transform: 'translateY(10px)' }, to: { opacity: 1, transform: 'none' } },
+          animation: 'chartsIn 0.35s ease both',
+        }}>
           {/* PDF download toolbar */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, mb: 2 }}>
+            {/* PDF success badge */}
+            {pdfSuccess && (
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 0.75,
+                px: 1, py: 0.3,
+                border: '1px solid rgba(107,143,113,0.35)',
+                borderRadius: '3px',
+                bgcolor: 'rgba(107,143,113,0.06)',
+                '@keyframes pdfBadgeIn': { from: { opacity: 0, transform: 'scale(0.85)' }, to: { opacity: 1, transform: 'scale(1)' } },
+                animation: 'pdfBadgeIn 0.25s cubic-bezier(0.34,1.56,0.64,1) both',
+              }}>
+                <SuccessCheck size={28} color="#6b8f71" />
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.65rem', color: '#6b8f71', letterSpacing: '0.06em' }}>
+                  Downloaded
+                </Typography>
+              </Box>
+            )}
             <Button
               variant="outlined"
               size="small"
