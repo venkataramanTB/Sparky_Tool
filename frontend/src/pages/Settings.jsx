@@ -709,7 +709,8 @@ export default function Settings() {
         </Box>
       </SectionCard>
 
-      {/* ── Section 03: Windows server access ───────────────────────────────── */}
+      {/* ── Section 03: Windows server access (shown for WinRM / SMB / SSH only) ── */}
+      {['winrm', 'smb', 'win_ssh'].includes(form.retrieval_method) && (
       <SectionCard number="03" title="Windows server access" subtitle="Browse and retrieve files from a Windows host — WinRM, SMB, or SSH" complete={sec03Complete}>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
 
@@ -857,9 +858,11 @@ export default function Settings() {
           </Box>
         </Box>
       </SectionCard>
+      )}
 
-      {/* ── Section 04: FTP server access ────────────────────────────────────── */}
-      <SectionCard number="04" title="FTP server access" subtitle="Browse and retrieve files via plain FTP or FTPS (explicit TLS)" complete={sec04Complete}>
+      {/* ── Section 03: FTP server access (shown for FTP / FTPS only) ─────────── */}
+      {form.retrieval_method === 'ftp' && (
+      <SectionCard number="03" title="FTP server access" subtitle="Browse and retrieve files via plain FTP or FTPS (explicit TLS)" complete={sec04Complete}>
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
 
           <Box sx={{ gridColumn: '1 / -1' }}>
@@ -951,6 +954,7 @@ export default function Settings() {
           </Box>
         </Box>
       </SectionCard>
+      )}
 
       {/* FTP browser dialog */}
       <FtpBrowser

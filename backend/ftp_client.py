@@ -3,10 +3,16 @@ ftp_client.py — FTP / FTPS file retrieval using stdlib ftplib.
 
 Supports plain FTP (port 21) and explicit FTPS (AUTH TLS on port 21).
 Passive mode is the default for NAT/firewall compatibility.
+
+Directory listing strategy (most → least capable):
+  1. MLSD  — RFC 3659, structured facts, best metadata
+  2. LIST  — Unix/IIS parseable output, distinguishes dirs from files
+  3. NLST  — names only, last resort (all items reported as 'file')
 """
 from __future__ import annotations
 import ftplib
 import io
+import re
 from logger import get_logger
 
 log = get_logger("ftp_client")
@@ -25,6 +31,49 @@ def _connect(host: str, port: int, username: str, password: str,
              host, port, username or "anonymous", tls, passive)
     return ftp
 
+
+# ── LIST output parsers ───────────────────────────────────────────────────────
+
+# Unix:  drwxr-xr-x  2 user group  4096 Jan  1 12:00 dirname
+_UNIX_RE = re.compile(
+    r'^([dl-])\S+\s+\d+\s+\S+\s+\S+\s+(\d+)\s+\w+\s+[\d ]\d\s+[\d:]+\s+(.+)$'
+)
+# Windows/IIS:  01-01-2024  12:00AM       <DIR>          dirname
+#           or  01-01-2024  12:00AM                 1234 filename.txt
+_WIN_RE = re.compile(
+    r'^\d{2}-\d{2}-\d{2,4}\s+\d{2}:\d{2}(?:AM|PM)\s+(<DIR>|\d+)\s+(.+)$'
+)
+
+
+def _parse_list_line(line: str) -> dict | None:
+    line = line.strip()
+    if not line:
+        return None
+
+    m = _UNIX_RE.match(line)
+    if m:
+        type_char, size_str, name = m.groups()
+        name = name.split(' -> ')[0].strip()   # strip symlink target
+        if name in ('.', '..'):
+            return None
+        item_type = 'dir' if type_char == 'd' else 'file'
+        return {'name': name, 'type': item_type,
+                'size': int(size_str) if item_type == 'file' else None, 'modified': None}
+
+    m = _WIN_RE.match(line)
+    if m:
+        size_or_dir, name = m.groups()
+        name = name.strip()
+        if name in ('.', '..'):
+            return None
+        item_type = 'dir' if size_or_dir == '<DIR>' else 'file'
+        return {'name': name, 'type': item_type,
+                'size': int(size_or_dir) if item_type == 'file' else None, 'modified': None}
+
+    return None
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
 
 def download_csv(remote_path: str | None = None, _settings=None) -> bytes:
     """Download a remote file and return raw bytes. Called by the run engine."""
@@ -67,11 +116,15 @@ def test_connection(host: str, port: int, username: str, password: str,
 def list_directory(host: str, port: int, username: str, password: str,
                    path: str, tls: bool = False, passive: bool = True) -> list[dict]:
     """List a directory. Returns [{name, type, size, modified}].
-    Uses MLSD (RFC 3659) with NLST fallback for older servers."""
+
+    Tries MLSD → LIST → NLST in order of decreasing capability.
+    Only NLST loses directory type information.
+    """
     ftp = _connect(host, port, username, password, tls, passive)
     try:
-        items: list[dict] = []
+        # ── Strategy 1: MLSD (RFC 3659) ──────────────────────────────────────
         try:
+            items: list[dict] = []
             for name, facts in ftp.mlsd(path):
                 if name in (".", ".."):
                     continue
@@ -83,14 +136,31 @@ def list_directory(host: str, port: int, username: str, password: str,
                     m = raw_mod
                     modified = f"{m[:4]}-{m[4:6]}-{m[6:8]}T{m[8:10]}:{m[10:12]}:{m[12:14]}"
                 items.append({"name": name, "type": item_type, "size": size, "modified": modified})
-        except ftplib.error_perm:
-            log.debug("ftp:list_directory MLSD not supported, falling back to NLST  path=%s", path)
-            for name in ftp.nlst(path):
-                bare = name.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
-                if bare not in (".", ".."):
-                    items.append({"name": bare, "type": "file", "size": None, "modified": None})
-        log.info("ftp:list_directory  path=%s  items=%d", path, len(items))
+            log.info("ftp:list_directory MLSD  path=%s  items=%d", path, len(items))
+            return items
+        except (ftplib.error_perm, ftplib.error_reply):
+            pass
+
+        # ── Strategy 2: LIST (Unix/IIS parseable) ────────────────────────────
+        try:
+            lines: list[str] = []
+            ftp.retrlines(f"LIST {path}", lines.append)
+            items = [r for line in lines if (r := _parse_list_line(line)) is not None]
+            if items:
+                log.info("ftp:list_directory LIST  path=%s  items=%d", path, len(items))
+                return items
+        except (ftplib.error_perm, ftplib.error_reply):
+            pass
+
+        # ── Strategy 3: NLST (names only, all reported as 'file') ────────────
+        items = []
+        for entry in ftp.nlst(path):
+            bare = entry.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+            if bare not in (".", "..") and bare:
+                items.append({"name": bare, "type": "file", "size": None, "modified": None})
+        log.info("ftp:list_directory NLST  path=%s  items=%d", path, len(items))
         return items
+
     finally:
         ftp.quit()
 
