@@ -7,6 +7,7 @@ import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import Preferences from './pages/Preferences'
 import SignInPage from './pages/SignIn'
+import ErrorBoundary from './components/ErrorBoundary'
 import { useAuth } from './AuthContext'
 
 const VALID_ROUTES = ['dashboard', 'settings', 'admin', 'preferences']
@@ -47,14 +48,18 @@ export default function App() {
   if (!user) return <SignInPage />
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
-      <Topbar route={route} navigate={navigate} user={user} onSignOut={signOut} />
-      <Box component="main" sx={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
-        {route === 'dashboard'   && <Dashboard />}
-        {route === 'settings'    && <Settings />}
-        {route === 'admin'       && <Admin />}
-        {route === 'preferences' && <Preferences />}
+    <ErrorBoundary>
+      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
+        <Topbar route={route} navigate={navigate} user={user} onSignOut={signOut} />
+        <Box component="main" sx={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+          <ErrorBoundary>
+            {route === 'dashboard'   && <Dashboard />}
+            {route === 'settings'    && <Settings />}
+            {route === 'admin'       && <Admin />}
+            {route === 'preferences' && <Preferences />}
+          </ErrorBoundary>
+        </Box>
       </Box>
-    </Box>
+    </ErrorBoundary>
   )
 }

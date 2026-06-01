@@ -30,7 +30,7 @@ import FunctionalDashboard  from './FunctionalDashboard'
 import OperationalDashboard from './OperationalDashboard'
 import AnalyzeDashboard     from './AnalyzeDashboard'
 import { useAuth } from '../AuthContext'
-import { listConfigs, listRuns, runConfig, downloadRunPdf, downloadFunctionalPdf, downloadOperationalPdf } from '../api'
+import { listConfigs, listRuns, runConfig, downloadRunPdf, downloadFunctionalPdf, downloadOperationalPdf, formatApiError } from '../api'
 
 // ── formatters ────────────────────────────────────────────────────────────────
 
@@ -249,7 +249,7 @@ export default function Dashboard() {
         if (saved.length && !activeConfigId) setActiveConfigId(saved[0].id)
         setRuns(runsRes.data.items)
       })
-      .catch((err) => setError(err.response?.data?.detail || 'Unable to load dashboard data'))
+      .catch((err) => setError(formatApiError(err, 'Unable to load dashboard data')))
       .finally(() => setPageLoading(false))
   }, [token])
 
@@ -275,7 +275,7 @@ export default function Dashboard() {
       // before the loading dialog dismisses.
       await refreshRuns()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Run failed unexpectedly')
+      setError(formatApiError(err, 'Run failed unexpectedly'))
       await refreshRuns()
     } finally {
       setRunning(false)
@@ -343,7 +343,7 @@ export default function Dashboard() {
             <Button
               startIcon={running
                 ? <CircularProgress size={13} sx={{ color: 'background.default' }} />
-                : <MythicsLogo width={6} />
+                : <MythicsLogo width={18} />
               }
               onClick={handleRun}
               disabled={running || pageLoading || !configs.length}
@@ -493,7 +493,7 @@ export default function Dashboard() {
           <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', p: 6, textAlign: 'center' }}>
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2.5 }}>
               <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                <MythicsLogo width={25} style={{ opacity: 0.5 }} />
+                <MythicsLogo width={64} style={{ opacity: 0.4 }} />
                 <Box sx={{
                   position: 'absolute', bottom: -2, right: -2,
                   width: 22, height: 22, borderRadius: '50%',

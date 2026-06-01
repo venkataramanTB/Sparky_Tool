@@ -61,6 +61,7 @@ import {
   toggleFeatureFlag, deleteFeatureFlag,
   adminConvStats,
   listAdminEngines, createEngine, updateEngine, deleteEngine,
+  formatApiError,
 } from '../api'
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
@@ -239,7 +240,7 @@ function InviteDialog({ open, onClose, onInvited, token }) {
       onInvited(res.data)
       close()
     } catch (e) {
-      setErr(e.response?.data?.detail || 'Failed to invite user. Check that CLERK_API_SECRET is configured.')
+      setErr(formatApiError(e, 'Failed to invite user. Check that CLERK_API_SECRET is configured.'))
     } finally {
       setBusy(false)
     }
@@ -421,7 +422,7 @@ export default function Admin() {
         setEngines(engRes.data.items ?? [])
         setError(null)
       })
-      .catch((err) => setError(err.response?.data?.detail || 'Unable to load admin data'))
+      .catch((err) => setError(formatApiError(err, 'Unable to load admin data')))
       .finally(() => setLoading(false))
   }, [token])
 
@@ -467,7 +468,7 @@ export default function Admin() {
       await setUserRole(userId, newRole, token)
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u))
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to update role')
+      setError(formatApiError(err, 'Failed to update role'))
     } finally {
       setRoleLoadingId(null)
     }
@@ -482,7 +483,7 @@ export default function Admin() {
       setDeleteDialog(null)
       setDeleteClerk(false)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to delete user')
+      setError(formatApiError(err, 'Failed to delete user'))
     } finally {
       setActionLoading(false)
     }
@@ -501,7 +502,7 @@ export default function Admin() {
       setUsers((prev) => prev.map((u) => u.id === editDialog.id ? { ...u, ...editForm } : u))
       setEditDialog(null)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to update user')
+      setError(formatApiError(err, 'Failed to update user'))
     } finally {
       setActionLoading(false)
     }
@@ -587,7 +588,7 @@ export default function Admin() {
       }
       setAiModelDialog(null)
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to save model')
+      setError(formatApiError(e, 'Failed to save model'))
     } finally {
       setAiModelLoading(false)
     }
@@ -601,7 +602,7 @@ export default function Admin() {
       setAiModels((prev) => prev.filter((m) => m.id !== deleteAiDialog.id))
       setDeleteAiDialog(null)
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to delete model')
+      setError(formatApiError(e, 'Failed to delete model'))
     } finally {
       setAiModelLoading(false)
     }
@@ -612,7 +613,7 @@ export default function Admin() {
       const res = await setDefaultAiModel(id, token)
       setAiModels((prev) => prev.map((m) => ({ ...m, is_default: m.id === res.data.id })))
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to set default')
+      setError(formatApiError(e, 'Failed to set default'))
     }
   }
 
@@ -640,7 +641,7 @@ export default function Admin() {
       }
       setEngineDialog(null)
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to save engine')
+      setError(formatApiError(e, 'Failed to save engine'))
     } finally {
       setEngineLoading(false)
     }
@@ -654,7 +655,7 @@ export default function Admin() {
       setEngines((prev) => prev.filter((e) => e.id !== deleteEngDlg.id))
       setDeleteEngDlg(null)
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to delete engine')
+      setError(formatApiError(e, 'Failed to delete engine'))
     } finally {
       setEngineLoading(false)
     }
@@ -1701,7 +1702,7 @@ export default function Admin() {
                   setFlagLoading(true)
                   createFeatureFlag(flagForm, token)
                     .then((r) => { setFlags((p) => [...p, r.data]); setFlagDialog(false) })
-                    .catch((e) => setError(e.response?.data?.detail || 'Failed to create flag'))
+                    .catch((e) => setError(formatApiError(e, 'Failed to create flag')))
                     .finally(() => setFlagLoading(false))
                 }}
                 disabled={flagLoading || !flagForm.key.trim()}
@@ -1731,7 +1732,7 @@ export default function Admin() {
                   setFlagLoading(true)
                   deleteFeatureFlag(deleteFlagDlg.id, token)
                     .then(() => { setFlags((p) => p.filter((f) => f.id !== deleteFlagDlg.id)); setDeleteFlagDlg(null) })
-                    .catch((e) => setError(e.response?.data?.detail || 'Failed to delete flag'))
+                    .catch((e) => setError(formatApiError(e, 'Failed to delete flag')))
                     .finally(() => setFlagLoading(false))
                 }}
                 disabled={flagLoading}

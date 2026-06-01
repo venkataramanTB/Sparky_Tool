@@ -12,7 +12,7 @@ import RefreshIcon         from '@mui/icons-material/Refresh'
 import HomeIcon            from '@mui/icons-material/Home'
 import ArticleIcon         from '@mui/icons-material/Article'
 import { useThemeContext } from '../ThemeContext'
-import { winBrowse, winReadFile } from '../api'
+import { winBrowse, winReadFile, formatApiError } from '../api'
 import MythicsLoader from './MythicsLoader'
 
 // Text file extensions that can be opened in the viewer
@@ -110,7 +110,7 @@ export default function WinServerBrowser({
       setItems(res.data.items || [])
       setCurrentPath(path)
     } catch (err) {
-      setError(err.response?.data?.detail ?? 'Failed to list directory')
+      setError(formatApiError(err, 'Failed to list directory'))
     } finally {
       setLoading(false)
     }
@@ -153,7 +153,7 @@ export default function WinServerBrowser({
       const res = await winReadFile({ ...creds, path })
       setFileContent(res.data.content)
     } catch (err) {
-      setFileError(err.response?.data?.detail ?? 'Failed to read file')
+      setFileError(formatApiError(err, 'Failed to read file'))
     } finally {
       setFileLoading(false)
     }

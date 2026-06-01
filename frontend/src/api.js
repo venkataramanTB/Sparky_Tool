@@ -30,6 +30,43 @@ client.interceptors.request.use(async (config) => {
   return config
 })
 
+// Normalise Pydantic v2 validation-error arrays to a plain string so every
+// component can safely render `err.response.data.detail` as a React child.
+// Pydantic v2 returns: detail: [{type, loc, msg, input}, ...]
+client.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const detail = err?.response?.data?.detail
+    if (Array.isArray(detail)) {
+      err.response.data.detail = detail
+        .map((e) => {
+          const loc = Array.isArray(e.loc) ? e.loc.slice(1).join('.') : ''
+          return loc ? `${loc}: ${e.msg}` : e.msg
+        })
+        .join('; ')
+    }
+    return Promise.reject(err)
+  }
+)
+
+/**
+ * Convert any axios error to a human-readable string.
+ * Handles: Pydantic v2 arrays (already normalised above), plain strings,
+ * 503 cold-start, network errors, and unknown shapes.
+ */
+export function formatApiError(err, fallback = 'An unexpected error occurred.') {
+  if (!err) return fallback
+  const status  = err?.response?.status
+  const detail  = err?.response?.data?.detail
+
+  if (status === 503) return 'The server is temporarily unavailable — it may be starting up. Please try again in a moment.'
+  if (status === 401) return 'Your session has expired. Please reload the page to sign in again.'
+  if (typeof detail === 'string' && detail) return detail
+  if (err.message === 'Network Error' || err.code === 'ERR_NETWORK')
+    return 'Cannot reach the server. Check your connection or try again shortly.'
+  return err?.message || fallback
+}
+
 const auth = (token) => (token ? { Authorization: `Bearer ${token}` } : {})
 
 // Health

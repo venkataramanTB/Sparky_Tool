@@ -10,7 +10,7 @@ import SaveIcon         from '@mui/icons-material/Save'
 import RestoreIcon      from '@mui/icons-material/Restore'
 import CheckCircleIcon  from '@mui/icons-material/CheckCircle'
 import { useAuth } from '../AuthContext'
-import { getPreferences, updatePreferences } from '../api'
+import { getPreferences, updatePreferences, formatApiError } from '../api'
 import MythicsLoader from '../components/MythicsLoader'
 
 const DEFAULTS = {
@@ -74,7 +74,7 @@ export default function Preferences() {
       const res = await getPreferences(token)
       setPrefs({ ...DEFAULTS, ...res.data })
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to load preferences')
+      setError(formatApiError(e, 'Failed to load preferences'))
     } finally {
       setLoading(false)
     }
@@ -91,7 +91,7 @@ export default function Preferences() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to save preferences')
+      setError(formatApiError(e, 'Failed to save preferences'))
     } finally {
       setSaving(false)
     }

@@ -15,7 +15,7 @@ import DnsIcon        from '@mui/icons-material/Dns'
 import StorageIcon    from '@mui/icons-material/Storage'
 import { useAuth } from '../AuthContext'
 import { useThemeContext } from '../ThemeContext'
-import { listConfigs, createConfig, updateConfig, deleteConfig, testRetrieval, testPeoplesoft, testWindows, testFtp, listEngines } from '../api'
+import { listConfigs, createConfig, updateConfig, deleteConfig, testRetrieval, testPeoplesoft, testWindows, testFtp, listEngines, formatApiError } from '../api'
 import WinServerBrowser from '../components/WinServerBrowser'
 import FtpBrowser from '../components/FtpBrowser'
 import MythicsLoader from '../components/MythicsLoader'
@@ -263,7 +263,7 @@ export default function Settings() {
       })
       setPsTestStatus({ ok: true, http_status: res.data.http_status, body: res.data.body ?? '', instance_id: res.data.instance_id ?? '', status_http_status: res.data.status_http_status, status_body: res.data.status_body ?? '' })
     } catch (err) {
-      setPsTestStatus({ ok: false, message: err.response?.data?.detail ?? 'API test failed' })
+      setPsTestStatus({ ok: false, message: parseError(err, 'API test failed') })
     }
   }
 
@@ -278,7 +278,7 @@ export default function Settings() {
       })
       setTestStatus({ ok: true, size_kb: res.data.size_kb })
     } catch (err) {
-      setTestStatus({ ok: false, message: err.response?.data?.detail ?? 'Connection test failed' })
+      setTestStatus({ ok: false, message: parseError(err, 'Connection test failed') })
     }
   }
 
@@ -295,7 +295,7 @@ export default function Settings() {
       })
       setFtpTestStatus({ ok: true, ...res.data })
     } catch (err) {
-      setFtpTestStatus({ ok: false, message: err.response?.data?.detail ?? 'FTP connection failed' })
+      setFtpTestStatus({ ok: false, message: parseError(err, 'FTP connection failed') })
     }
   }
 
@@ -339,7 +339,7 @@ export default function Settings() {
       setSuccess(true)
       setTimeout(() => setSuccess(false), 4000)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save configuration.')
+      setError(formatApiError(err, 'Failed to save configuration.'))
     } finally { setSaving(false) }
   }
 

@@ -19,7 +19,7 @@ import UploadFileIcon    from '@mui/icons-material/UploadFile'
 import AutoAwesomeIcon   from '@mui/icons-material/AutoAwesome'
 import TableChartIcon    from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon  from '@mui/icons-material/PictureAsPdf'
-import { analyzeFile, listInsightModels, downloadAnalysisPdf } from '../api'
+import { analyzeFile, listInsightModels, downloadAnalysisPdf, formatApiError } from '../api'
 import MythicsLoader from '../components/MythicsLoader'
 import SuccessCheck from '../components/SuccessCheck'
 
@@ -408,14 +408,14 @@ export default function AnalyzeDashboard() {
             setShowSuccess(true)
             setTimeout(() => setShowSuccess(false), 1600)
           } catch (retryErr) {
-            setError(retryErr?.response?.data?.detail || 'Server still starting — please try again in a moment.')
+            setError(formatApiError(retryErr, 'Server still starting — please try again in a moment.'))
           } finally {
             setRetrying(false)
             setLoading(false)
           }
         }, 8000)
       } else {
-        setError(err?.response?.data?.detail || err.message || 'Analysis failed — check the server logs.')
+        setError(formatApiError(err, 'Analysis failed — check the server logs.'))
       }
     } finally {
       if (!willRetry) setLoading(false)

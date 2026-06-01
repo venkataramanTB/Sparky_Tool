@@ -17,7 +17,7 @@ import ArrowDropUpIcon     from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon   from '@mui/icons-material/ArrowDropDown'
 import UnfoldMoreIcon      from '@mui/icons-material/UnfoldMore'
 import { useThemeContext } from '../ThemeContext'
-import { ftpBrowse, ftpReadFile } from '../api'
+import { ftpBrowse, ftpReadFile, formatApiError } from '../api'
 import MythicsLoader from './MythicsLoader'
 
 const TEXT_EXTS = new Set([
@@ -126,7 +126,7 @@ export default function FtpBrowser({
       setItems(res.data.items || [])
       setCurrentPath(normPath)
     } catch (err) {
-      setError(err.response?.data?.detail ?? `Cannot list ${normPath}`)
+      setError(formatApiError(err, `Cannot list ${normPath}`))
     } finally {
       setLoading(false)
     }
@@ -172,7 +172,7 @@ export default function FtpBrowser({
       const res = await ftpReadFile({ ...creds, path })
       setFileContent(res.data.content)
     } catch (err) {
-      setFileError(err.response?.data?.detail ?? 'Failed to read file')
+      setFileError(formatApiError(err, 'Failed to read file'))
     } finally {
       setFileLoading(false)
     }
