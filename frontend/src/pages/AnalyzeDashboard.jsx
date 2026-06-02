@@ -32,6 +32,36 @@ const pal = (i) => PALETTE[i % PALETTE.length]
 
 const PROVIDER_COLORS = { gemini: '#4285f4', openai: '#10a37f', anthropic: '#d4a84b', grok: '#1da1f2', generic: '#888' }
 
+// ── keyboard hint helpers ──────────────────────────────────────────────────────
+const IS_MAC = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
+const MOD    = IS_MAC ? '⌘' : 'Ctrl'
+
+function KbdHint({ keys, sx = {} }) {
+  return (
+    <Box
+      component="span"
+      sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.3, flexShrink: 0, ...sx }}
+    >
+      {keys.split('+').map((k) => (
+        <Box key={k} component="kbd" sx={{
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: '0.48rem',
+          color: 'text.disabled',
+          bgcolor: 'rgba(128,128,128,0.07)',
+          border: '1px solid', borderColor: 'divider',
+          borderRadius: '2px',
+          px: 0.55, py: 0.1,
+          lineHeight: 1.6,
+          userSelect: 'none',
+          display: 'inline-block',
+        }}>
+          {k}
+        </Box>
+      ))}
+    </Box>
+  )
+}
+
 // ── DynamicChart ───────────────────────────────────────────────────────────────
 // Renders any chart spec that Gemini returns.  One switch on `type` → Recharts.
 
@@ -215,11 +245,13 @@ function ChartCard({ spec }) {
 
 // ── DropZone ───────────────────────────────────────────────────────────────────
 
-function DropZone({ onFile, loading }) {
+function DropZone({ onFile, loading, browseRef }) {
   const theme   = useTheme()
   const accent  = theme.palette.primary.main
   const inputRef = useRef(null)
   const [dragging, setDragging] = useState(false)
+
+  if (browseRef) browseRef.current = () => inputRef.current?.click()
 
   const pick = useCallback((f) => {
     if (f) onFile(f)
@@ -277,10 +309,29 @@ function DropZone({ onFile, loading }) {
               fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700,
               letterSpacing: '0.14em', textTransform: 'uppercase', px: 3.5, py: 1,
               '&:hover': { borderColor: accent, bgcolor: `${accent}12` },
+              display: 'inline-flex', alignItems: 'center', gap: 0.85,
             }}
           >
             Browse file
+            <KbdHint keys={`${MOD}+O`} />
           </Button>
+
+          {/* shortcut legend */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mt: 2.5, flexWrap: 'wrap' }}>
+            {[
+              [`${MOD}+O`, 'browse'],
+              [`${MOD}+D`, 'PDF'],
+              ['Esc',       'reset'],
+              [`${MOD}+↵`,  're-run'],
+            ].map(([keys, label]) => (
+              <Box key={keys} sx={{ display: 'flex', alignItems: 'center', gap: 0.55 }}>
+                <KbdHint keys={keys} />
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.58rem', color: 'text.disabled', letterSpacing: '0.06em' }}>
+                  {label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )}
     </Box>
@@ -498,6 +549,7 @@ export default function AnalyzeDashboard() {
   const accent  = theme.palette.primary.main
   const { getToken } = useAuth()
   const chartsRef = useRef(null)
+  const browseRef = useRef(null)
   const [loading,         setLoading]         = useState(false)
   const [pdfLoading,      setPdfLoading]      = useState(false)
   const [showSuccess,     setShowSuccess]     = useState(false)
@@ -618,6 +670,21 @@ export default function AnalyzeDashboard() {
     }
   }, [result, filename])
 
+  // ── keyboard shortcuts ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName ?? ''
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag)) return
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key === 'o') { e.preventDefault(); if (!loading) browseRef.current?.(); return }
+      if (e.key === 'Escape' && result) { setResult(null); setFilename(''); setError(null); return }
+      if (mod && e.key === 'd' && result && !pdfLoading) { e.preventDefault(); downloadPdf(); return }
+      if (mod && e.key === 'Enter' && pendingFile && !loading) { e.preventDefault(); handleFile(pendingFile); return }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [result, loading, pdfLoading, pendingFile, downloadPdf, handleFile])
+
   // While the model selector is being fetched, show the same full-page
   // Mythics loading screen used elsewhere so the UX is consistent.
   if (modelsLoading && !result) {
@@ -715,7 +782,7 @@ export default function AnalyzeDashboard() {
         ) : modelsError ? (
           <Alert severity="error" sx={{ mt: 2 }}>{modelsError}</Alert>
         ) : (
-          <DropZone onFile={handleFile} loading={loading} />
+          <DropZone onFile={handleFile} loading={loading} browseRef={browseRef} />
         )
       )}
 
@@ -803,7 +870,11 @@ export default function AnalyzeDashboard() {
                 '&:hover': { borderColor: accent, bgcolor: `${accent}08` },
               }}
             >
-              {pdfLoading ? 'Generating…' : 'Download PDF'}
+              {pdfLoading ? 'Generating…' : (
+                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.85 }}>
+                  Download PDF<KbdHint keys={`${MOD}+D`} />
+                </Box>
+              )}
             </Button>
           </Box>
 
@@ -832,7 +903,9 @@ export default function AnalyzeDashboard() {
                 '&:hover': { color: accent },
               }}
             >
-              Upload another file
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.85 }}>
+                Upload another file<KbdHint keys="Esc" />
+              </Box>
             </Button>
           </Box>
         </Box>
