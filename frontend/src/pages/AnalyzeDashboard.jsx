@@ -232,14 +232,14 @@ function DropZone({ onFile, loading }) {
       onDrop={(e) => { e.preventDefault(); setDragging(false); pick(e.dataTransfer?.files?.[0]) }}
       onClick={() => !loading && inputRef.current?.click()}
       sx={{
-        border: `2px dashed ${dragging ? accent : theme.palette.divider}`,
+        border: `1px solid ${dragging ? accent : `${accent}30`}`,
         borderRadius: 2,
-        py: 7, px: 4,
+        py: 8, px: 5,
         textAlign: 'center',
         cursor: loading ? 'default' : 'pointer',
-        transition: 'all 0.2s',
-        bgcolor: dragging ? `${accent}08` : 'transparent',
-        '&:hover': loading ? {} : { borderColor: `${accent}88`, bgcolor: `${accent}05` },
+        transition: 'all 0.22s ease',
+        bgcolor: dragging ? `${accent}0a` : `${accent}04`,
+        '&:hover': loading ? {} : { borderColor: `${accent}70`, bgcolor: `${accent}08` },
       }}
     >
       <input
@@ -253,30 +253,30 @@ function DropZone({ onFile, loading }) {
       {loading ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
           <MythicsLoader size={80} />
-          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', color: 'text.secondary' }}>
-            AI is analysing your data…
+          <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontWeight: 700, fontSize: '1.55rem', color: 'text.primary', letterSpacing: '0.01em', lineHeight: 1.2 }}>
+            Analysing your data…
           </Typography>
-          <Typography sx={{ fontSize: '0.68rem', color: 'text.disabled' }}>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem', color: 'text.secondary', mt: 0.25 }}>
             This takes 5 – 15 seconds depending on file size
           </Typography>
         </Box>
       ) : (
         <Box>
-          <UploadFileIcon sx={{ fontSize: 44, color: 'text.disabled', mb: 1.5 }} />
-          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.92rem', mb: 0.5 }}>
-            Drop a CSV or Excel file here
+          <UploadFileIcon sx={{ fontSize: 52, color: accent, opacity: 0.4, mb: 2 }} />
+          <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontWeight: 700, fontSize: '1.75rem', color: 'text.primary', mb: 0.85, letterSpacing: '0.01em', lineHeight: 1.1 }}>
+            Drop a file to analyse
           </Typography>
-          <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', mb: 2 }}>
-            .csv · .xlsx · .xls — Gemini reads the data and picks the best charts automatically
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.84rem', color: 'text.secondary', mb: 3, lineHeight: 1.7 }}>
+            CSV · Excel (.xlsx / .xls) — AI auto-generates the most insightful charts for your data
           </Typography>
           <Button
             variant="outlined"
             size="small"
             sx={{
-              borderColor: `${accent}44`, color: accent,
-              fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem',
-              letterSpacing: '0.1em', textTransform: 'uppercase',
-              '&:hover': { borderColor: accent, bgcolor: `${accent}08` },
+              borderColor: `${accent}55`, color: accent,
+              fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700,
+              letterSpacing: '0.14em', textTransform: 'uppercase', px: 3.5, py: 1,
+              '&:hover': { borderColor: accent, bgcolor: `${accent}12` },
             }}
           >
             Browse file
@@ -301,13 +301,13 @@ function SummaryBar({ result, filename }) {
   const spacyUsed  = result.meta?.pii_spacy
 
   return (
-    <Card variant="outlined" sx={{ bgcolor: `${accent}07`, borderColor: `${accent}20`, mb: 3 }}>
+    <Card variant="outlined" sx={{ bgcolor: `${accent}09`, borderColor: `${accent}30`, mb: 3 }}>
       <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
           <TableChartIcon sx={{ fontSize: 15, color: accent }} />
           <Typography sx={{
             fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-            fontSize: '0.62rem', letterSpacing: '0.16em',
+            fontSize: '0.72rem', letterSpacing: '0.14em',
             textTransform: 'uppercase', color: accent,
           }}>
             {filename}
@@ -358,7 +358,7 @@ function SummaryBar({ result, filename }) {
             </Tooltip>
           )}
         </Box>
-        <Typography sx={{ fontSize: '0.78rem', color: 'text.primary', lineHeight: 1.75 }}>
+        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.92rem', color: 'text.primary', lineHeight: 1.9, fontStyle: 'italic' }}>
           {result.summary}
         </Typography>
       </CardContent>
@@ -410,31 +410,33 @@ function RunOutputHistory({ onAnalyze, analysing }) {
 
   return (
     <Box sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-        <HistoryIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Box sx={{ width: 22, height: '1px', bgcolor: `${accent}40` }} />
+        <HistoryIcon sx={{ fontSize: 13, color: accent, opacity: 0.65 }} />
         <Typography sx={{
           fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-          fontSize: '0.58rem', letterSpacing: '0.2em',
-          textTransform: 'uppercase', color: 'text.disabled',
+          fontSize: '0.6rem', letterSpacing: '0.22em',
+          textTransform: 'uppercase', color: 'text.secondary',
         }}>
           Run History
         </Typography>
+        <Box sx={{ flex: 1, height: '1px', bgcolor: `${accent}20` }} />
       </Box>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         {outputs.map((o) => (
-          <Card key={o.id} variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider' }}>
-            <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Card key={o.id} variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: `${accent}18`, transition: 'border-color 0.18s ease', '&:hover': { borderColor: `${accent}45` } }}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               {/* info */}
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography sx={{
                   fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-                  fontSize: '0.75rem', mb: 0.25,
+                  fontSize: '0.84rem', mb: 0.35, color: 'text.primary',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {o.display_name}
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', gap: 1.25, flexWrap: 'wrap' }}>
                   {[
                     o.config_name && `Config: ${o.config_name}`,
                     o.engine_name && `Engine: ${o.engine_name}`,
@@ -442,7 +444,7 @@ function RunOutputHistory({ onAnalyze, analysing }) {
                     o.file_size_bytes && fmtSize(o.file_size_bytes),
                     fmtDate(o.created_at),
                   ].filter(Boolean).map((label) => (
-                    <Typography key={label} sx={{ fontSize: '0.62rem', color: 'text.secondary' }}>
+                    <Typography key={label} sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', color: 'text.secondary' }}>
                       {label}
                     </Typography>
                   ))}
@@ -625,18 +627,18 @@ export default function AnalyzeDashboard() {
   return (
     <Box>
       {/* ── section header ────────────────────────────────────────────────── */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3, flexWrap: 'wrap' }}>
-        <AutoAwesomeIcon sx={{ color: accent, fontSize: 18 }} />
-        <Typography sx={{
-          fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-          fontSize: '0.62rem', letterSpacing: '0.22em',
-          textTransform: 'uppercase', color: 'text.secondary',
-        }}>
-          AI Chart Analyser
-        </Typography>
-        <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>
-          — upload any CSV or Excel and AI auto-generates charts
-        </Typography>
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.75, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.85 }}>
+            <AutoAwesomeIcon sx={{ color: accent, fontSize: 14, opacity: 0.8 }} />
+            <Typography sx={{
+              fontFamily: '"Raleway", sans-serif', fontWeight: 700,
+              fontSize: '0.57rem', letterSpacing: '0.28em',
+              textTransform: 'uppercase', color: accent, opacity: 0.8,
+            }}>
+              AI Chart Analyser
+            </Typography>
+          </Box>
 
         {modelsLoading ? (
           <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -686,6 +688,22 @@ export default function AnalyzeDashboard() {
             </FormControl>
           </Box>
         ) : null}
+        </Box>
+
+        <Typography sx={{
+          fontFamily: '"Cormorant Garamond", serif', fontWeight: 700,
+          fontSize: '2.4rem', color: 'text.primary', letterSpacing: '0.01em',
+          lineHeight: 1.05, mb: 1.25,
+        }}>
+          Intelligent Data Visualisation
+        </Typography>
+        <Typography sx={{
+          fontFamily: '"Raleway", sans-serif', fontSize: '0.9rem',
+          color: 'text.secondary', lineHeight: 1.75, maxWidth: 600,
+        }}>
+          Upload any CSV or Excel file — AI reads your data and automatically generates the most
+          insightful charts, with a plain-language summary
+        </Typography>
       </Box>
 
       {/* ── drop zone (hidden once results arrive) and until models loaded ── */}
