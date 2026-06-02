@@ -16,6 +16,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import { useAuth } from '../AuthContext'
 import { listConfigs, listSchedules, createSchedule, updateSchedule, deleteSchedule, formatApiError } from '../api'
 import MythicsLoader from '../components/MythicsLoader'
+import KbdHint, { MOD } from '../components/KbdHint'
 
 const FREQ_LABELS = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
 const DOW_LABELS  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -107,6 +108,20 @@ export default function SchedulesPage() {
 
   const f = (k) => (v) => setForm((p) => ({ ...p, [k]: v }))
 
+  // ── keyboard shortcuts ──────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName ?? ''
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag)) return
+      const mod = e.ctrlKey || e.metaKey
+      if (e.key === 'Escape' && dialogOpen) { setDialogOpen(false); return }
+      if (mod && e.key === 's' && dialogOpen) { e.preventDefault(); handleSave(); return }
+      if ((e.key === 'n' || e.key === 'N') && !mod && !dialogOpen) { openNew(); return }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [dialogOpen, handleSave, openNew])
+
   if (loading) return <MythicsLoader size={60} sx={{ py: 10 }} />
 
   return (
@@ -133,7 +148,7 @@ export default function SchedulesPage() {
             '&:hover': { bgcolor: 'primary.light' }, '&:disabled': { opacity: 0.45 },
           }}
         >
-          New Schedule
+          <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.85 }}>New Schedule<KbdHint keys="N" /></Box>
         </Button>
       </Box>
 
@@ -293,7 +308,7 @@ export default function SchedulesPage() {
           </Button>
           <Button onClick={handleSave} disabled={saving || !form.config_id}
             sx={{ bgcolor: accent, color: 'background.default', fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.72rem', px: 3, '&:hover': { bgcolor: 'primary.light' } }}>
-            {saving ? <CircularProgress size={14} sx={{ color: 'background.default' }} /> : 'Save'}
+            {saving ? <CircularProgress size={14} sx={{ color: 'background.default' }} /> : <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>Save<KbdHint keys={`${MOD}+S`} /></Box>}
           </Button>
         </DialogActions>
       </Dialog>

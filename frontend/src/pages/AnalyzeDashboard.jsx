@@ -25,42 +25,13 @@ import { analyzeFile, analyzeRunOutput, listRunOutputs, deleteRunOutput, listIns
 import { useAuth } from '../AuthContext'
 import MythicsLoader from '../components/MythicsLoader'
 import SuccessCheck from '../components/SuccessCheck'
+import KbdHint, { IS_MAC, MOD } from '../components/KbdHint'
 
 // ── colour palette (matches backend prompt) ────────────────────────────────────
 const PALETTE = ['#6b8f71','#6495b4','#c9a84c','#b45050','#9b59b6','#e67e22','#1abc9c','#e74c3c']
 const pal = (i) => PALETTE[i % PALETTE.length]
 
 const PROVIDER_COLORS = { gemini: '#4285f4', openai: '#10a37f', anthropic: '#d4a84b', grok: '#1da1f2', generic: '#888' }
-
-// ── keyboard hint helpers ──────────────────────────────────────────────────────
-const IS_MAC = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform)
-const MOD    = IS_MAC ? '⌘' : 'Ctrl'
-
-function KbdHint({ keys, sx = {} }) {
-  return (
-    <Box
-      component="span"
-      sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.3, flexShrink: 0, ...sx }}
-    >
-      {keys.split('+').map((k) => (
-        <Box key={k} component="kbd" sx={{
-          fontFamily: '"JetBrains Mono", monospace',
-          fontSize: '0.48rem',
-          color: 'text.disabled',
-          bgcolor: 'rgba(128,128,128,0.07)',
-          border: '1px solid', borderColor: 'divider',
-          borderRadius: '2px',
-          px: 0.55, py: 0.1,
-          lineHeight: 1.6,
-          userSelect: 'none',
-          display: 'inline-block',
-        }}>
-          {k}
-        </Box>
-      ))}
-    </Box>
-  )
-}
 
 // ── DynamicChart ───────────────────────────────────────────────────────────────
 // Renders any chart spec that Gemini returns.  One switch on `type` → Recharts.

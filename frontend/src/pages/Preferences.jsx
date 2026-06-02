@@ -12,6 +12,7 @@ import CheckCircleIcon  from '@mui/icons-material/CheckCircle'
 import { useAuth } from '../AuthContext'
 import { getPreferences, updatePreferences, getNotificationSettings, updateNotificationSettings, formatApiError } from '../api'
 import MythicsLoader from '../components/MythicsLoader'
+import KbdHint, { MOD } from '../components/KbdHint'
 
 const DEFAULTS = {
   dateFormat:                'YYYY-MM-DD',
@@ -123,6 +124,19 @@ export default function Preferences() {
 
   const handleReset = () => setPrefs(DEFAULTS)
 
+  // ── keyboard shortcuts ──────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName ?? ''
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag)) return
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key === 's') { e.preventDefault(); handleSave(); return }
+      if (mod && e.key === 'R' && e.shiftKey) { e.preventDefault(); handleReset(); return }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [handleSave])
+
   if (loading) return <MythicsLoader sx={{ minHeight: '60vh' }} />
 
   return (
@@ -145,7 +159,7 @@ export default function Preferences() {
             onClick={handleReset}
             sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', borderColor: 'divider', color: 'text.secondary' }}
           >
-            Reset
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>Reset<KbdHint keys={`${MOD}+Shift+R`} /></Box>
           </Button>
           <Button
             size="small"
@@ -155,7 +169,7 @@ export default function Preferences() {
             disabled={saving}
             sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', bgcolor: saved ? '#6b8f71' : 'primary.main', color: 'background.default' }}
           >
-            {saved ? 'Saved!' : 'Save'}
+            {saved ? 'Saved!' : <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>Save<KbdHint keys={`${MOD}+S`} /></Box>}
           </Button>
         </Box>
       </Box>

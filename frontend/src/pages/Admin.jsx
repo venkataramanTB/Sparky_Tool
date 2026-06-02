@@ -661,6 +661,43 @@ export default function Admin() {
     }
   }
 
+  // ── keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName ?? ''
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag)) return
+      const mod = e.ctrlKey || e.metaKey
+      const anyOpen = inviteOpen || Boolean(deleteDialog) || Boolean(editDialog)
+        || Boolean(aiModelDialog) || Boolean(deleteAiDialog)
+        || flagDialog || Boolean(deleteFlagDlg)
+        || Boolean(deleteEngDlg)
+
+      if (e.key === 'Escape') {
+        if (inviteOpen)        { setInviteOpen(false);       return }
+        if (deleteDialog)      { setDeleteDialog(null);      return }
+        if (editDialog)        { setEditDialog(null);        return }
+        if (aiModelDialog)     { setAiModelDialog(null);     return }
+        if (deleteAiDialog)    { setDeleteAiDialog(null);    return }
+        if (flagDialog)        { setFlagDialog(false);       return }
+        if (deleteFlagDlg)     { setDeleteFlagDlg(null);     return }
+        if (deleteEngDlg)      { setDeleteEngDlg(null);      return }
+        return
+      }
+      if (anyOpen || mod) return
+
+      if (e.key >= '1' && e.key <= '9') { setTab(Number(e.key) - 1); return }
+      if (e.key === 'r' || e.key === 'R') { load(); return }
+      if (e.key === 'n' || e.key === 'N') {
+        if (tab === 2) { setInviteOpen(true); return }
+        if (tab === 4) { openAddModel(); return }
+        if (tab === 6) { setFlagDialog(true); return }
+        if (tab === 8) { openAddEngine(); return }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tab, inviteOpen, deleteDialog, editDialog, aiModelDialog, deleteAiDialog, flagDialog, deleteFlagDlg, deleteEngDlg, load, openAddModel, openAddEngine])
+
   // ── guards ────────────────────────────────────────────────────────────────
 
   if (!user?.role || user.role !== 'admin') {

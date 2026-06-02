@@ -21,6 +21,7 @@ import FtpBrowser from '../components/FtpBrowser'
 import MythicsLoader from '../components/MythicsLoader'
 import SuccessCheck from '../components/SuccessCheck'
 import DataQualityPanel from '../components/DataQualityPanel'
+import KbdHint, { MOD } from '../components/KbdHint'
 
 const WIN_DEFAULT_PORTS = { winrm: '5985', smb: '445', ssh: '22' }
 const FTP_DEFAULT_PORTS = { ftp: '21', ftps: '21' }
@@ -383,6 +384,21 @@ export default function Settings() {
 
   const btnSx = { color: accent, borderColor: `${accent}59`, borderRadius: '3px', fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.65rem', letterSpacing: '0.16em', px: 2.5, py: 0.9, '&:hover:not(:disabled)': { borderColor: accent, bgcolor: `${accent}0a` }, '&:disabled': { opacity: 0.4 } }
 
+  // ── keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName ?? ''
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag)) return
+      const anyDialogOpen = psBodyOpen || winBrowserOpen || ftpBrowserOpen
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key === 's') { e.preventDefault(); handleSave(); return }
+      if (mod && (e.key === 'Delete' || e.key === 'Backspace') && selectedConfigId) { e.preventDefault(); handleDeleteConfig(); return }
+      if ((e.key === 'n' || e.key === 'N') && !mod && !anyDialogOpen) { setSelectedConfigId(null); setForm(EMPTY); return }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [psBodyOpen, winBrowserOpen, ftpBrowserOpen, selectedConfigId, handleSave, handleDeleteConfig])
+
   if (loading) return (
     <MythicsLoader sx={{ flex: 1, minHeight: '100vh', bgcolor: 'background.default' }} />
   )
@@ -419,8 +435,8 @@ export default function Settings() {
             Profile
           </Typography>
           <Button onClick={() => { setSelectedConfigId(null); setForm(EMPTY) }} variant="outlined" size="small"
-            sx={{ color: accent, borderColor: `${accent}33`, borderRadius: '3px', fontFamily: '"Raleway"', fontSize: '0.6rem', letterSpacing: '0.15em', fontWeight: 700, py: 0.4, px: 1.5, minWidth: 0 }}>
-            New
+            sx={{ color: accent, borderColor: `${accent}33`, borderRadius: '3px', fontFamily: '"Raleway"', fontSize: '0.6rem', letterSpacing: '0.15em', fontWeight: 700, py: 0.4, px: 1.5, minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 0.6 }}>
+            New<KbdHint keys="N" />
           </Button>
           {selectedConfigId && (
             <Button onClick={handleDeleteConfig} variant="outlined" size="small"
@@ -1045,7 +1061,12 @@ export default function Settings() {
             '&:disabled': { opacity: 0.5 },
             transition: 'all 0.2s ease',
           }}>
-          {saving ? 'Saving...' : selectedConfigId ? 'Update configuration' : 'Create configuration'}
+          {saving ? 'Saving…' : (
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.85 }}>
+              {selectedConfigId ? 'Update configuration' : 'Create configuration'}
+              <KbdHint keys={`${MOD}+S`} />
+            </Box>
+          )}
         </Button>
       </Box>
 

@@ -9,6 +9,7 @@ import Preferences from './pages/Preferences'
 import SchedulesPage from './pages/SchedulesPage'
 import SignInPage from './pages/SignIn'
 import ErrorBoundary from './components/ErrorBoundary'
+import KeyboardShortcutsDialog from './components/KeyboardShortcutsDialog'
 import { useAuth } from './AuthContext'
 
 const VALID_ROUTES = ['dashboard', 'settings', 'admin', 'preferences', 'schedules']
@@ -20,8 +21,9 @@ function getRoute() {
 }
 
 export default function App() {
-  const [ready, setReady] = useState(false)
-  const [route, setRoute] = useState(getRoute)
+  const [ready,          setReady]          = useState(false)
+  const [route,          setRoute]          = useState(getRoute)
+  const [shortcutsOpen,  setShortcutsOpen]  = useState(false)
   const { user, loading, signOut } = useAuth()
 
   useEffect(() => {
@@ -42,6 +44,35 @@ export default function App() {
     window.location.hash = to
     setRoute(to)
   }, [])
+
+  // Global keyboard shortcuts — G+key navigation chord and ? cheatsheet
+  useEffect(() => {
+    if (!user) return
+    let pendingG = false
+    let gTimer   = null
+    const NAV = { d: 'dashboard', c: 'settings', h: 'schedules', a: 'admin', p: 'preferences' }
+
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName ?? ''
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag)) return
+      if (e.key === '?') { setShortcutsOpen((v) => !v); return }
+
+      if ((e.key === 'g' || e.key === 'G') && !e.ctrlKey && !e.metaKey) {
+        pendingG = true
+        clearTimeout(gTimer)
+        gTimer = setTimeout(() => { pendingG = false }, 1200)
+        return
+      }
+      if (pendingG) {
+        pendingG = false
+        clearTimeout(gTimer)
+        const dest = NAV[e.key.toLowerCase()]
+        if (dest) { e.preventDefault(); navigate(dest) }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey); clearTimeout(gTimer) }
+  }, [user, navigate])
 
   // Keep the startup screen visible until BOTH the backend health check passes
   // (ready) AND Clerk auth has finished resolving (loading). This prevents a
@@ -71,6 +102,7 @@ export default function App() {
           </ErrorBoundary>
         </Box>
       </Box>
+      <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </ErrorBoundary>
   )
 }

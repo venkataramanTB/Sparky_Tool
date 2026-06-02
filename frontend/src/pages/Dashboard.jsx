@@ -35,6 +35,7 @@ import { listConfigs, listRuns, runConfig, downloadRunPdf, downloadFunctionalPdf
 import RunDiffDialog from '../components/RunDiffDialog'
 import CompareArrows from '@mui/icons-material/CompareArrows'
 import VerifiedIcon  from '@mui/icons-material/VerifiedUser'
+import KbdHint       from '../components/KbdHint'
 
 // ── formatters ────────────────────────────────────────────────────────────────
 
@@ -288,6 +289,24 @@ export default function Dashboard() {
     }
   }
 
+  // ── keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName ?? ''
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tag)) return
+      const mod = e.ctrlKey || e.metaKey
+      if ((e.key === 'r' || e.key === 'R') && !mod && !running && configs.length) { handleRun(); return }
+      if (e.key >= '1' && e.key <= '4' && !mod) { handleDashTabChange(null, Number(e.key) - 1); return }
+      if ((e.key === 'p' || e.key === 'P') && !mod && dashTab !== 3 && !pdfTabLoading) { downloadTabPdf(); return }
+      if ((e.key === 'c' || e.key === 'C') && !mod && runOutputs.length >= 2) { setDiffOpen(true); return }
+      if ((e.key === 'v' || e.key === 'V') && !mod && dashTab === 0) {
+        handleRunsViewChange(runsView === 'table' ? 'cards' : 'table'); return
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [running, configs, dashTab, pdfTabLoading, runOutputs, runsView, handleRun, handleDashTabChange, downloadTabPdf, handleRunsViewChange])
+
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
@@ -371,7 +390,7 @@ export default function Dashboard() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {running ? 'Running…' : 'Run'}
+              {running ? 'Running…' : <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.85 }}>Run<KbdHint keys="R" /></Box>}
             </Button>
           </Box>
         </Box>
@@ -396,15 +415,15 @@ export default function Dashboard() {
               '& .MuiTabs-indicator': { bgcolor: accent },
             }}
           >
-            <Tab label="Run"         />
-            <Tab label="Functional"  />
-            <Tab label="Operational" />
-            <Tab label="Analyse"     />
+            <Tab label={<Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.6 }}>Run<KbdHint keys="1" /></Box>} />
+            <Tab label={<Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.6 }}>Functional<KbdHint keys="2" /></Box>} />
+            <Tab label={<Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.6 }}>Operational<KbdHint keys="3" /></Box>} />
+            <Tab label={<Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.6 }}>Analyse<KbdHint keys="4" /></Box>} />
           </Tabs>
 
           {/* PDF download button — hidden on the AI Analysis tab (it has its own) */}
           {dashTab !== 3 && (
-            <Tooltip title={`Download ${TAB_NAMES[dashTab]} as PDF`} arrow placement="left">
+            <Tooltip title={`Download ${TAB_NAMES[dashTab]} as PDF  (P)`} arrow placement="left">
               <span>
                 <IconButton
                   onClick={downloadTabPdf}
@@ -553,7 +572,7 @@ export default function Dashboard() {
                       }}
                       variant="outlined"
                     >
-                      Compare
+                      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>Compare<KbdHint keys="C" /></Box>
                     </Button>
                   </Tooltip>
                 )}
