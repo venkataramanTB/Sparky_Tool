@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     smtp_from:     str  = ""
     smtp_use_tls:  bool = True
 
-    model_config = {"env_file": ".env", "case_sensitive": False}
+    # Allow extra environment variables (e.g. local dev keys) without failing
+    model_config = {"env_file": ".env", "case_sensitive": False, "extra": "ignore"}
 
 @lru_cache
 def get_settings() -> Settings:
