@@ -11,6 +11,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import { useAuth } from './AuthContext'
 
 const VALID_ROUTES = ['dashboard', 'settings', 'admin', 'preferences']
+const KEEP_ALIVE_MS = 10 * 60 * 1000  // ping every 10 min; Render sleeps after 15
 
 function getRoute() {
   const h = window.location.hash.slice(1)
@@ -26,6 +27,14 @@ export default function App() {
     const handler = () => setRoute(getRoute())
     window.addEventListener('hashchange', handler)
     return () => window.removeEventListener('hashchange', handler)
+  }, [])
+
+  // Keep the Render backend awake while the tab is open
+  useEffect(() => {
+    const base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+    const ping = () => fetch(`${base}/api/ping`).catch(() => {})
+    const id = setInterval(ping, KEEP_ALIVE_MS)
+    return () => clearInterval(id)
   }, [])
 
   const navigate = useCallback((to) => {

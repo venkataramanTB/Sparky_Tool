@@ -88,7 +88,8 @@ async def log_requests(request: Request, call_next):
     elapsed = round((_time.time() - t0) * 1000)
     path = request.url.path
 
-    if not path.startswith("/assets/") and path not in ("/favicon.ico",):
+    _silent = {"/favicon.ico", "/api/ping"}
+    if not path.startswith("/assets/") and path not in _silent:
         log.info("%-6s %-55s %3d  %d ms", request.method, path, response.status_code, elapsed)
 
     # Emit wide event for all v2 API calls (fire-and-forget).
@@ -528,6 +529,12 @@ def ready(response: Response):
         response.status_code = 503
         return {"ready": False, "reason": "db_unavailable", "db_latency_ms": result.get("latency_ms")}
     return {"ready": True, "db_latency_ms": result.get("latency_ms")}
+
+
+@app.get("/api/ping")
+def ping():
+    """Lightweight keep-alive probe — no DB, no auth, not logged."""
+    return {"ok": True}
 
 
 @app.post("/api/run")
