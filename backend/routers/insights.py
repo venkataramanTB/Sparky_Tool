@@ -320,13 +320,15 @@ General rules:
 - Choose chart type wisely: pie for ≤8 slices, radialBar for KPI-style percentages, scatter for correlations
 - Colors to use: {colors}
 - Assign one color per yKey or per pie/radialBar slice
+- Multi-sheet rule: if the profile contains a "sheets" key, analyse EVERY sheet and produce charts
+  covering all sheets. Prefix each chart title with the sheet name (e.g. "Payroll – Monthly Totals").
+  Also include at least one cross-sheet comparison chart where the data permits it.
 - Return ONLY valid JSON. No explanation. No markdown."""
 
 
-def _build_profile(df: pd.DataFrame, filename: str, max_sample: int = 100) -> dict:
-    """Build a compact dataset profile for the Gemini prompt."""
+def _build_sheet_profile(df: pd.DataFrame, max_sample: int = 100) -> dict:
+    """Build a profile dict for a single DataFrame (one sheet or a CSV)."""
     profile: dict = {
-        "filename": filename,
         "total_rows": len(df),
         "total_columns": len(df.columns),
         "columns": [],
@@ -349,7 +351,6 @@ def _build_profile(df: pd.DataFrame, filename: str, max_sample: int = 100) -> di
             info["top_values"] = series.value_counts().head(8).to_dict()
         profile["columns"].append(info)
 
-    # Aggregate value_counts for every categorical column (helps Gemini make pie/bar)
     cat_aggs = {}
     for col in df.select_dtypes(exclude="number").columns:
         vc = df[col].value_counts().head(15)
@@ -357,17 +358,65 @@ def _build_profile(df: pd.DataFrame, filename: str, max_sample: int = 100) -> di
     if cat_aggs:
         profile["category_counts"] = cat_aggs
 
-    # Numeric correlations (small matrix)
     num_cols = df.select_dtypes(include="number").columns.tolist()
     if len(num_cols) >= 2:
         corr = df[num_cols].corr().round(2).to_dict()
         profile["correlations"] = corr
 
-    # Sample rows (capped)
     sample = df.head(max_sample).where(pd.notnull(df), other=None)
     profile["sample_rows"] = json.loads(sample.to_json(orient="records", date_format="iso"))
 
     return profile
+
+
+_MAX_SHEETS = 10  # guard against workbooks with dozens of sheets
+
+
+def _build_profile(
+    df_or_sheets: "pd.DataFrame | dict[str, pd.DataFrame]",
+    filename: str,
+    max_sample: int = 100,
+) -> dict:
+    """Build a compact dataset profile for the AI prompt.
+
+    Accepts either a single DataFrame (CSV / single-sheet Excel) or a dict of
+    {sheet_name: DataFrame} for multi-sheet workbooks.
+    """
+    if not isinstance(df_or_sheets, dict):
+        # Single-sheet / CSV path — unchanged behaviour
+        profile = _build_sheet_profile(df_or_sheets, max_sample)
+        profile["filename"] = filename
+        return profile
+
+    # Multi-sheet Excel path
+    sheets_raw = {k: v for k, v in df_or_sheets.items() if not v.empty}
+    if len(sheets_raw) > _MAX_SHEETS:
+        sheets_raw = dict(list(sheets_raw.items())[:_MAX_SHEETS])
+
+    # Scale sample size down so total prompt size stays roughly constant
+    per_sheet_sample = max(20, max_sample // len(sheets_raw))
+
+    sheets: dict = {}
+    all_col_names: list[str] = []
+    total_rows = 0
+
+    for sheet_name, df in sheets_raw.items():
+        sp = _build_sheet_profile(df, per_sheet_sample)
+        sheets[sheet_name] = sp
+        total_rows += sp["total_rows"]
+        for c in sp["columns"]:
+            if c["name"] not in all_col_names:
+                all_col_names.append(c["name"])
+
+    return {
+        "filename":       filename,
+        "total_rows":     total_rows,
+        "total_columns":  len(all_col_names),
+        "sheet_count":    len(sheets),
+        # flat columns list kept for meta compatibility; full per-sheet detail is in "sheets"
+        "columns":        [{"name": n} for n in all_col_names],
+        "sheets":         sheets,
+    }
 
 
 def _extract_json(text: str) -> dict:
@@ -431,9 +480,13 @@ async def analyze_file(
             else:
                 raise HTTPException(422, "Could not decode CSV — try saving the file as UTF-8")
         elif ext in ("xlsx", "xlsm"):
-            df = pd.read_excel(io.BytesIO(raw), engine="openpyxl")
+            sheets = pd.read_excel(io.BytesIO(raw), engine="openpyxl", sheet_name=None)
+            non_empty = {k: v for k, v in sheets.items() if not v.empty}
+            df = next(iter(non_empty.values())) if len(non_empty) == 1 else non_empty
         elif ext == "xls":
-            df = pd.read_excel(io.BytesIO(raw), engine="xlrd")
+            sheets = pd.read_excel(io.BytesIO(raw), engine="xlrd", sheet_name=None)
+            non_empty = {k: v for k, v in sheets.items() if not v.empty}
+            df = next(iter(non_empty.values())) if len(non_empty) == 1 else non_empty
         else:
             raise HTTPException(400, f"Unsupported file type: .{ext}  (use .csv / .xlsx / .xls)")
     except HTTPException:
@@ -441,14 +494,16 @@ async def analyze_file(
     except Exception as exc:
         raise HTTPException(422, f"Could not parse file: {exc}") from exc
 
-    if df.empty:
+    is_empty = df.empty if isinstance(df, pd.DataFrame) else not df
+    if is_empty:
         raise HTTPException(422, "File is empty or could not be read")
 
     # ── build compact profile ────────────────────────────────────────────────
     profile = _build_profile(df, fname)
+    sheet_count = profile.get("sheet_count", 1)
     log.info(
-        "analyze_file  user=%s  file=%s  rows=%d  cols=%d",
-        user.id[:8], fname, profile["total_rows"], profile["total_columns"],
+        "analyze_file  user=%s  file=%s  rows=%d  cols=%d  sheets=%d",
+        user.id[:8], fname, profile["total_rows"], profile["total_columns"], sheet_count,
     )
 
     # ── PII masking — protect sensitive values before they reach the LLM ─────
@@ -590,6 +645,7 @@ async def analyze_file(
         "filename":        fname,
         "total_rows":      profile["total_rows"],
         "total_columns":   profile["total_columns"],
+        "sheet_count":     sheet_count,
         "columns":         [c["name"] for c in profile["columns"]],
         "conversation_id": conversation_id,
         "pii_protected":   masker.masked_count > 0,

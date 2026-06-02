@@ -292,6 +292,7 @@ function SummaryBar({ result, filename }) {
 
   const totalRows  = result.meta?.total_rows    ?? result.row_count
   const totalCols  = result.meta?.total_columns ?? result.col_count
+  const sheetCount = result.meta?.sheet_count   ?? 1
   const piiActive  = result.meta?.pii_protected
   const piiCount   = result.meta?.pii_masked_count ?? 0
   const spacyUsed  = result.meta?.pii_spacy
@@ -323,6 +324,13 @@ function SummaryBar({ result, filename }) {
             size="small"
             sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
           />
+          {sheetCount > 1 && (
+            <Chip
+              label={`${sheetCount} sheets`}
+              size="small"
+              sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
+            />
+          )}
 
           {/* PII protection badge */}
           {piiActive && (
