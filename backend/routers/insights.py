@@ -290,7 +290,7 @@ Dataset:
 
 Return a single JSON object (NO markdown, NO code fences, raw JSON only) with this exact structure:
 {{
-  "summary": "2-3 sentence plain-English description of what this dataset contains and key patterns",
+  "summary": "For a single sheet: 2-3 sentences describing the dataset and key patterns. For multi-sheet files: one sentence per sheet describing what it contains, then a final sentence on how the sheets relate to each other.",
   "charts": [
     {{
       "id": "c1",
@@ -314,16 +314,24 @@ Data format rules per chart type:
 - scatter                 → data is [{{"x": number, "y": number, "label":"..."}}]; set xKey="x" yKeys=["y"]
 
 General rules:
-- Produce 5–8 charts that together tell a complete story about the data
 - Pre-aggregate/group the data — do NOT put hundreds of raw rows in any chart
 - For bar/line/area keep at most 20 data points; use top-N or time-bucketing as needed
 - Choose chart type wisely: pie for ≤8 slices, radialBar for KPI-style percentages, scatter for correlations
 - Colors to use: {colors}
 - Assign one color per yKey or per pie/radialBar slice
-- Multi-sheet rule: if the profile contains a "sheets" key, analyse EVERY sheet and produce charts
-  covering all sheets. Prefix each chart title with the sheet name (e.g. "Payroll – Monthly Totals").
-  Also include at least one cross-sheet comparison chart where the data permits it.
-- Return ONLY valid JSON. No explanation. No markdown."""
+- Return ONLY valid JSON. No explanation. No markdown.
+
+Chart count rules:
+- Single sheet (no "sheets" key in profile): produce 5–8 charts that tell a complete story.
+- Multi-sheet (profile contains a "sheets" key):
+    * You MUST analyse EVERY sheet without exception — do not skip any sheet.
+    * Produce 3–5 charts for EACH sheet. Prefix every chart title with the sheet name
+      (e.g. "Payroll – Monthly Totals", "Headcount – By Department").
+    * After the per-sheet charts, add 1–3 cross-sheet comparison charts that combine
+      data from two or more sheets (e.g. comparing a KPI across sheets, or showing
+      how one sheet's categories break down relative to another).
+    * The total chart count will naturally exceed 8 for multi-sheet files — this is
+      correct and expected. Do NOT artificially limit it."""
 
 
 def _build_sheet_profile(df: pd.DataFrame, max_sample: int = 100) -> dict:
@@ -641,6 +649,17 @@ def _run_analysis(raw: bytes, fname: str, user: "User", db: "Session", ai_model_
             "total":      prompt_tokens + completion_tokens,
         },
     }
+
+    # For multi-sheet workbooks, include per-sheet row and column metadata so
+    # the frontend can show a breakdown of each tab in the insights panel.
+    if sheet_count > 1 and "sheets" in profile:
+        chart_spec["meta"]["sheets_meta"] = {
+            name: {
+                "rows":    sp["total_rows"],
+                "columns": [c["name"] for c in sp["columns"]],
+            }
+            for name, sp in profile["sheets"].items()
+        }
 
     log.info(
         "analyze  user=%s  charts=%d  tokens=%d",

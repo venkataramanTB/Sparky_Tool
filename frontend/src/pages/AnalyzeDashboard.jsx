@@ -363,6 +363,9 @@ function InsightsPanel({ result, filename }) {
   const piiCount   = result.meta?.pii_masked_count ?? 0
   const spacyUsed  = result.meta?.pii_spacy
   const sheetCount = result.meta?.sheet_count   ?? 1
+  // sheets_meta is populated only for multi-sheet workbooks:
+  // { SheetName: { rows: number, columns: string[] } }
+  const sheetsMeta = result.meta?.sheets_meta   ?? null
 
   return (
     <Card variant="outlined" sx={{
@@ -439,9 +442,75 @@ function InsightsPanel({ result, filename }) {
         </Typography>
 
         {/* ── column list ───────────────────────────────────────────────────────
-            Every column name is shown as a subtle chip so the user can quickly
-            confirm the AI saw the right fields and spot any unexpected columns. */}
-        {columns.length > 0 && (
+            Multi-sheet: one collapsible block per sheet showing its row count
+            and columns, so every tab is accounted for in the dashboard.
+            Single-sheet: flat chip list as before.                           */}
+        {sheetsMeta ? (
+          <Box sx={{ mb: tokens.total > 0 ? 3 : 0 }}>
+            <Typography sx={{
+              fontFamily: '"Raleway", sans-serif', fontSize: '0.52rem',
+              letterSpacing: '0.18em', textTransform: 'uppercase',
+              color: 'text.disabled', mb: 1.75,
+            }}>
+              {sheetCount} sheets · {columns.length} total columns
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {Object.entries(sheetsMeta).map(([sheetName, sheetData], idx) => (
+                <Box key={sheetName}>
+                  {/* sheet name row */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.85 }}>
+                    <Box sx={{
+                      width: 18, height: 18, borderRadius: '3px',
+                      bgcolor: `${PALETTE[idx % PALETTE.length]}22`,
+                      border: `1px solid ${PALETTE[idx % PALETTE.length]}44`,
+                      display: 'grid', placeItems: 'center', flexShrink: 0,
+                    }}>
+                      <Typography sx={{
+                        fontFamily: '"Raleway", sans-serif', fontSize: '0.48rem',
+                        fontWeight: 700, color: PALETTE[idx % PALETTE.length],
+                        lineHeight: 1,
+                      }}>
+                        {idx + 1}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{
+                      fontFamily: '"Raleway", sans-serif', fontWeight: 700,
+                      fontSize: '0.72rem', color: 'text.primary',
+                    }}>
+                      {sheetName}
+                    </Typography>
+                    <Typography sx={{
+                      fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem',
+                      color: 'text.disabled',
+                    }}>
+                      {fmtCompact(sheetData.rows)} rows · {sheetData.columns.length} columns
+                    </Typography>
+                  </Box>
+
+                  {/* column chips for this sheet */}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, pl: 3.5 }}>
+                    {sheetData.columns.map((col) => (
+                      <Chip
+                        key={col}
+                        label={col}
+                        size="small"
+                        sx={{
+                          bgcolor: `${PALETTE[idx % PALETTE.length]}0d`,
+                          color: 'text.secondary',
+                          border: `1px solid ${PALETTE[idx % PALETTE.length]}22`,
+                          fontFamily: '"Raleway", sans-serif',
+                          fontSize: '0.62rem', height: 20,
+                          '& .MuiChip-label': { px: 1.1 },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        ) : columns.length > 0 ? (
           <Box sx={{ mb: tokens.total > 0 ? 3 : 0 }}>
             <Typography sx={{
               fontFamily: '"Raleway", sans-serif', fontSize: '0.52rem',
@@ -468,7 +537,7 @@ function InsightsPanel({ result, filename }) {
               ))}
             </Box>
           </Box>
-        )}
+        ) : null}
 
         {/* ── token usage footer ────────────────────────────────────────────────
             Providers that report usage (Gemini / OpenAI / Anthropic) populate
