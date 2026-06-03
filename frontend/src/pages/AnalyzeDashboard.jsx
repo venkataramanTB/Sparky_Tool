@@ -21,6 +21,11 @@ import TableChartIcon    from '@mui/icons-material/TableChart'
 import PictureAsPdfIcon  from '@mui/icons-material/PictureAsPdf'
 import HistoryIcon       from '@mui/icons-material/History'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import StorageIcon       from '@mui/icons-material/Storage'
+import ViewColumnIcon    from '@mui/icons-material/ViewColumn'
+import BarChartIcon      from '@mui/icons-material/BarChart'
+import FlashOnIcon       from '@mui/icons-material/FlashOn'
+import LockIcon          from '@mui/icons-material/Lock'
 import { analyzeFile, analyzeRunOutput, listRunOutputs, deleteRunOutput, listInsightModels, downloadAnalysisPdf, formatApiError } from '../api'
 import { useAuth } from '../AuthContext'
 import MythicsLoader from '../components/MythicsLoader'
@@ -33,8 +38,16 @@ const pal = (i) => PALETTE[i % PALETTE.length]
 
 const PROVIDER_COLORS = { gemini: '#4285f4', openai: '#10a37f', anthropic: '#d4a84b', grok: '#1da1f2', generic: '#888' }
 
+// Compact number formatter: 1,234,567 → "1.2M", 15300 → "15.3K"
+const fmtCompact = (n) => {
+  if (n == null) return '—'
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 10_000)    return `${(n / 1_000).toFixed(1)}K`
+  return n.toLocaleString()
+}
+
 // ── DynamicChart ───────────────────────────────────────────────────────────────
-// Renders any chart spec that Gemini returns.  One switch on `type` → Recharts.
+// Renders any chart spec that the AI returns.  One switch on `type` → Recharts.
 
 function DynamicChart({ spec }) {
   const { type, data = [], xKey, yKeys = [], nameKey = 'name', dataKey = 'value', colors = PALETTE } = spec
@@ -156,7 +169,6 @@ function DynamicChart({ spec }) {
               />
             )
           }
-          // bar
           return (
             <Bar key={key} dataKey={key} fill={c(i)} radius={[2, 2, 0, 0]} isAnimationActive={false} />
           )
@@ -211,6 +223,322 @@ function ChartCard({ spec }) {
         </Typography>
       </CardContent>
     </Card>
+  )
+}
+
+// ── StatCard ───────────────────────────────────────────────────────────────────
+// Single metric tile: top accent stripe, large value, icon badge.
+// Used in the dashboard summary row above the charts.
+
+function StatCard({ label, value, sub, Icon, color }) {
+  const theme  = useTheme()
+  const accent = color || theme.palette.primary.main
+  return (
+    <Card variant="outlined" sx={{
+      bgcolor: 'background.paper', borderColor: 'divider',
+      height: '100%', position: 'relative', overflow: 'hidden',
+    }}>
+      {/* coloured accent stripe at top — each card gets a distinct colour so
+          users can scan the row at a glance without reading the labels */}
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, bgcolor: accent, opacity: 0.55 }} />
+      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box>
+            <Typography sx={{
+              fontFamily: '"Raleway", sans-serif', fontSize: '0.52rem',
+              letterSpacing: '0.22em', textTransform: 'uppercase',
+              color: 'text.disabled', mb: 0.75,
+            }}>
+              {label}
+            </Typography>
+            <Typography sx={{
+              fontFamily: '"Cormorant Garamond", serif',
+              fontSize: '2rem', fontWeight: 700,
+              color: 'text.primary', lineHeight: 1,
+            }}>
+              {value}
+            </Typography>
+            {sub && (
+              <Typography sx={{
+                fontSize: '0.62rem', color: 'text.secondary',
+                mt: 0.75, fontFamily: '"Raleway", sans-serif',
+              }}>
+                {sub}
+              </Typography>
+            )}
+          </Box>
+          {Icon && (
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '4px',
+              bgcolor: `${accent}14`, display: 'grid',
+              placeItems: 'center', flexShrink: 0,
+            }}>
+              <Icon sx={{ fontSize: 16, color: accent }} />
+            </Box>
+          )}
+        </Box>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── StatsRow ───────────────────────────────────────────────────────────────────
+// Reads from the result object and renders 4–5 StatCards in a responsive row.
+// Cards are conditional: token and PII cards only appear when those values exist.
+
+function StatsRow({ result }) {
+  const totalRows  = result.meta?.total_rows    ?? result.row_count
+  const totalCols  = result.meta?.total_columns ?? result.col_count
+  const chartCount = (result.charts || []).length
+  const tokens     = result.meta?.token_usage   ?? {}
+  const piiActive  = result.meta?.pii_protected
+  const piiCount   = result.meta?.pii_masked_count ?? 0
+  const sheetCount = result.meta?.sheet_count   ?? 1
+
+  const cards = [
+    {
+      label: 'Total Rows',
+      value: fmtCompact(totalRows),
+      sub:   'data records',
+      Icon:  StorageIcon,
+      color: '#6b8f71',
+    },
+    {
+      label: 'Columns',
+      value: fmtCompact(totalCols),
+      sub:   sheetCount > 1 ? `across ${sheetCount} sheets` : 'fields analysed',
+      Icon:  ViewColumnIcon,
+      color: '#6495b4',
+    },
+    {
+      label: 'Charts',
+      value: String(chartCount),
+      sub:   'AI-generated views',
+      Icon:  BarChartIcon,
+      color: '#c9a84c',
+    },
+    // Only shown when the model reports token usage (Gemini / OpenAI / Anthropic)
+    ...(tokens.total > 0 ? [{
+      label: 'AI Tokens',
+      value: fmtCompact(tokens.total),
+      sub:   `${fmtCompact(tokens.prompt)} prompt · ${fmtCompact(tokens.completion)} output`,
+      Icon:  FlashOnIcon,
+      color: '#9b59b6',
+    }] : []),
+    // Only shown when PII was detected and masked
+    ...(piiActive ? [{
+      label: 'PII Shielded',
+      value: String(piiCount),
+      sub:   'values masked before AI',
+      Icon:  LockIcon,
+      color: '#6b8f71',
+    }] : []),
+  ]
+
+  return (
+    <Grid container spacing={2} sx={{ mb: 3 }}>
+      {cards.map((card) => (
+        // md prop without a value expands each card equally in the row
+        <Grid item xs={6} sm={4} md key={card.label}>
+          <StatCard {...card} />
+        </Grid>
+      ))}
+    </Grid>
+  )
+}
+
+// ── InsightsPanel ──────────────────────────────────────────────────────────────
+// The main narrative card. Shows: AI summary, every column name as a chip,
+// and a token-usage breakdown footer. Replaces the old SummaryBar which only
+// showed the summary as italic text inside a small coloured card.
+
+function InsightsPanel({ result, filename }) {
+  const theme  = useTheme()
+  const accent = theme.palette.primary.main
+  const dark   = theme.palette.mode === 'dark'
+
+  const columns    = result.meta?.columns       ?? []
+  const tokens     = result.meta?.token_usage   ?? {}
+  const piiActive  = result.meta?.pii_protected
+  const piiCount   = result.meta?.pii_masked_count ?? 0
+  const spacyUsed  = result.meta?.pii_spacy
+  const sheetCount = result.meta?.sheet_count   ?? 1
+
+  return (
+    <Card variant="outlined" sx={{
+      bgcolor: dark ? `${accent}08` : `${accent}04`,
+      borderColor: `${accent}28`, mb: 3,
+    }}>
+      <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+
+        {/* ── card header: icon + "AI Insight" label + filename + badges ─────── */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5, flexWrap: 'wrap' }}>
+          <AutoAwesomeIcon sx={{ fontSize: 14, color: accent, opacity: 0.85 }} />
+          <Typography sx={{
+            fontFamily: '"Raleway", sans-serif', fontWeight: 700,
+            fontSize: '0.6rem', letterSpacing: '0.24em',
+            textTransform: 'uppercase', color: accent, opacity: 0.9,
+          }}>
+            AI Insight
+          </Typography>
+
+          {/* thin separator between label and filename */}
+          <Box sx={{ height: 10, width: '1px', bgcolor: `${accent}35`, mx: 0.25 }} />
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+            <TableChartIcon sx={{ fontSize: 11, color: 'text.disabled' }} />
+            <Typography sx={{
+              fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem',
+              color: 'text.secondary', fontWeight: 600,
+            }}>
+              {filename}
+            </Typography>
+          </Box>
+
+          {sheetCount > 1 && (
+            <Chip
+              label={`${sheetCount} sheets`}
+              size="small"
+              sx={{
+                bgcolor: `${accent}14`, color: accent,
+                fontFamily: '"Raleway", sans-serif', fontSize: '0.58rem', height: 17,
+              }}
+            />
+          )}
+
+          {piiActive && (
+            <Tooltip
+              title={`${piiCount} sensitive value${piiCount !== 1 ? 's' : ''} were masked before the AI saw the data${spacyUsed ? ' (regex + spaCy NER)' : ' (regex patterns)'} and restored afterward. The AI never saw raw personal information.`}
+              arrow
+              placement="top"
+            >
+              <Chip
+                icon={<LockIcon sx={{ fontSize: '11px !important', ml: '6px !important', color: '#6b8f71 !important' }} />}
+                label={`PII · ${piiCount} values masked`}
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(107,143,113,0.12)', color: '#6b8f71',
+                  border: '1px solid rgba(107,143,113,0.25)',
+                  fontFamily: '"Raleway", sans-serif', fontSize: '0.58rem',
+                  height: 17, cursor: 'help',
+                }}
+              />
+            </Tooltip>
+          )}
+        </Box>
+
+        {/* ── AI narrative — the main summary text ─────────────────────────────
+            We give this more breathing room and a slightly larger font than the
+            old SummaryBar so it reads as a proper paragraph, not a caption.    */}
+        <Typography sx={{
+          fontFamily: '"Raleway", sans-serif', fontSize: '0.97rem',
+          color: 'text.primary', lineHeight: 1.9,
+          fontStyle: 'italic', mb: 3,
+        }}>
+          {result.summary}
+        </Typography>
+
+        {/* ── column list ───────────────────────────────────────────────────────
+            Every column name is shown as a subtle chip so the user can quickly
+            confirm the AI saw the right fields and spot any unexpected columns. */}
+        {columns.length > 0 && (
+          <Box sx={{ mb: tokens.total > 0 ? 3 : 0 }}>
+            <Typography sx={{
+              fontFamily: '"Raleway", sans-serif', fontSize: '0.52rem',
+              letterSpacing: '0.18em', textTransform: 'uppercase',
+              color: 'text.disabled', mb: 1.25,
+            }}>
+              {columns.length} column{columns.length !== 1 ? 's' : ''} analysed
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+              {columns.map((col) => (
+                <Chip
+                  key={col}
+                  label={col}
+                  size="small"
+                  sx={{
+                    bgcolor: `${accent}0c`,
+                    color: 'text.secondary',
+                    border: `1px solid ${accent}1c`,
+                    fontFamily: '"Raleway", sans-serif',
+                    fontSize: '0.63rem', height: 21,
+                    '& .MuiChip-label': { px: 1.25 },
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {/* ── token usage footer ────────────────────────────────────────────────
+            Providers that report usage (Gemini / OpenAI / Anthropic) populate
+            meta.token_usage.  We show prompt / completion / total so users can
+            estimate cost or compare models.  Hidden when total is 0.           */}
+        {tokens.total > 0 && (
+          <Box sx={{
+            pt: 2.5,
+            borderTop: `1px solid ${accent}1a`,
+            display: 'flex', gap: 3.5, flexWrap: 'wrap', alignItems: 'center',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+              <FlashOnIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
+              <Typography sx={{
+                fontFamily: '"Raleway", sans-serif', fontSize: '0.52rem',
+                letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.disabled',
+              }}>
+                Token usage
+              </Typography>
+            </Box>
+
+            {[
+              ['Prompt',     tokens.prompt],
+              ['Completion', tokens.completion],
+              ['Total',      tokens.total],
+            ].filter(([, v]) => v).map(([label, val]) => (
+              <Box key={label}>
+                <Typography sx={{
+                  fontFamily: '"Raleway", sans-serif', fontSize: '0.5rem',
+                  letterSpacing: '0.12em', textTransform: 'uppercase',
+                  color: 'text.disabled', mb: 0.2,
+                }}>
+                  {label}
+                </Typography>
+                <Typography sx={{
+                  fontFamily: '"Cormorant Garamond", serif',
+                  fontSize: '1.1rem', fontWeight: 700,
+                  color: 'text.secondary', lineHeight: 1,
+                }}>
+                  {val?.toLocaleString()}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ── SectionDivider ─────────────────────────────────────────────────────────────
+// Thin ruled line with a centred label — used to separate the Insights panel
+// from the charts grid, mirroring the "Run History" divider in RunOutputHistory.
+
+function SectionDivider({ label }) {
+  const theme  = useTheme()
+  const accent = theme.palette.primary.main
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 3 }}>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: `${accent}1c` }} />
+      <Typography sx={{
+        fontFamily: '"Raleway", sans-serif', fontWeight: 700,
+        fontSize: '0.52rem', letterSpacing: '0.28em',
+        textTransform: 'uppercase', color: 'text.disabled',
+        whiteSpace: 'nowrap',
+      }}>
+        {label}
+      </Typography>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: `${accent}1c` }} />
+    </Box>
   )
 }
 
@@ -306,85 +634,6 @@ function DropZone({ onFile, loading, browseRef }) {
         </Box>
       )}
     </Box>
-  )
-}
-
-// ── SummaryBar ─────────────────────────────────────────────────────────────────
-
-function SummaryBar({ result, filename }) {
-  const theme  = useTheme()
-  const accent = theme.palette.primary.main
-
-  const totalRows  = result.meta?.total_rows    ?? result.row_count
-  const totalCols  = result.meta?.total_columns ?? result.col_count
-  const sheetCount = result.meta?.sheet_count   ?? 1
-  const piiActive  = result.meta?.pii_protected
-  const piiCount   = result.meta?.pii_masked_count ?? 0
-  const spacyUsed  = result.meta?.pii_spacy
-
-  return (
-    <Card variant="outlined" sx={{ bgcolor: `${accent}09`, borderColor: `${accent}30`, mb: 3 }}>
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-          <TableChartIcon sx={{ fontSize: 15, color: accent }} />
-          <Typography sx={{
-            fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-            fontSize: '0.72rem', letterSpacing: '0.14em',
-            textTransform: 'uppercase', color: accent,
-          }}>
-            {filename}
-          </Typography>
-          <Chip
-            label={`${totalRows?.toLocaleString() ?? '—'} rows`}
-            size="small"
-            sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
-          />
-          <Chip
-            label={`${totalCols ?? '—'} columns`}
-            size="small"
-            sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
-          />
-          <Chip
-            label={`${(result.charts || []).length} charts`}
-            size="small"
-            sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
-          />
-          {sheetCount > 1 && (
-            <Chip
-              label={`${sheetCount} sheets`}
-              size="small"
-              sx={{ bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', height: 18 }}
-            />
-          )}
-
-          {/* PII protection badge */}
-          {piiActive && (
-            <Tooltip
-              title={`${piiCount} sensitive value${piiCount !== 1 ? 's' : ''} were masked before sending to the AI${spacyUsed ? ' (regex + spaCy NER)' : ' (regex patterns)'} and restored afterward. The AI never saw your raw data.`}
-              arrow
-              placement="top"
-            >
-              <Chip
-                icon={<span style={{ fontSize: 11, lineHeight: 1, marginLeft: 6 }}>🛡</span>}
-                label={`PII protected · ${piiCount} values`}
-                size="small"
-                sx={{
-                  bgcolor: 'rgba(107,143,113,0.12)',
-                  color: '#6b8f71',
-                  border: '1px solid rgba(107,143,113,0.25)',
-                  fontFamily: '"Raleway", sans-serif',
-                  fontSize: '0.6rem', height: 20,
-                  cursor: 'help',
-                }}
-              />
-            </Tooltip>
-          )}
-        </Box>
-        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.92rem', color: 'text.primary', lineHeight: 1.9, fontStyle: 'italic' }}>
-          {result.summary}
-        </Typography>
-      </CardContent>
-    </Card>
   )
 }
 
@@ -534,7 +783,8 @@ export default function AnalyzeDashboard() {
   const [selectedModelId, setSelectedModelId] = useState(null)
   const [modelsLoading,   setModelsLoading]   = useState(true)
   const [modelsError,     setModelsError]     = useState(null)
-  const [analysingOutput, setAnalysingOutput] = useState(null)  // run-output id being analysed
+  const [analysingOutput, setAnalysingOutput] = useState(null)
+
   useEffect(() => {
     setModelsLoading(true)
     setModelsError(null)
@@ -656,8 +906,6 @@ export default function AnalyzeDashboard() {
     return () => window.removeEventListener('keydown', onKey)
   }, [result, loading, pdfLoading, pendingFile, downloadPdf, handleFile])
 
-  // While the model selector is being fetched, show the same full-page
-  // Mythics loading screen used elsewhere so the UX is consistent.
   if (modelsLoading && !result) {
     return <MythicsLoader sx={{ flex: 1, bgcolor: 'background.default' }} />
   }
@@ -678,54 +926,54 @@ export default function AnalyzeDashboard() {
             </Typography>
           </Box>
 
-        {modelsLoading ? (
-          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CircularProgress size={18} />
-            <Typography sx={{ fontSize: '0.66rem', color: 'text.disabled' }}>Loading models…</Typography>
-          </Box>
-        ) : models.length > 0 ? (
-          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography sx={{
-              fontSize: '0.55rem', letterSpacing: '0.16em', textTransform: 'uppercase',
-              color: 'text.disabled', fontFamily: '"Raleway", sans-serif',
-            }}>
-              Model
-            </Typography>
-            <FormControl size="small">
-              <Select
-                value={selectedModelId ?? ''}
-                onChange={(e) => setSelectedModelId(e.target.value === '' ? null : e.target.value)}
-                displayEmpty
-                sx={{
-                  fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', height: 28, minWidth: 180,
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: `${accent}30` },
-                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${accent}70` },
-                  '& .MuiSelect-icon': { fontSize: 16 },
-                }}
-              >
-                <MenuItem value="" sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', color: 'text.disabled' }}>
-                  Default
-                </MenuItem>
-                {models.map((m) => (
-                  <MenuItem key={m.id} value={m.id} sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                      <Box sx={{
-                        width: 7, height: 7, borderRadius: '50%',
-                        bgcolor: PROVIDER_COLORS[m.provider] || '#888', flexShrink: 0,
-                      }} />
-                      {m.name}
-                      {m.is_default && (
-                        <Typography component="span" sx={{ fontSize: '0.55rem', color: 'text.disabled', fontFamily: '"Raleway", sans-serif' }}>
-                          (default)
-                        </Typography>
-                      )}
-                    </Box>
+          {modelsLoading ? (
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={18} />
+              <Typography sx={{ fontSize: '0.66rem', color: 'text.disabled' }}>Loading models…</Typography>
+            </Box>
+          ) : models.length > 0 ? (
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{
+                fontSize: '0.55rem', letterSpacing: '0.16em', textTransform: 'uppercase',
+                color: 'text.disabled', fontFamily: '"Raleway", sans-serif',
+              }}>
+                Model
+              </Typography>
+              <FormControl size="small">
+                <Select
+                  value={selectedModelId ?? ''}
+                  onChange={(e) => setSelectedModelId(e.target.value === '' ? null : e.target.value)}
+                  displayEmpty
+                  sx={{
+                    fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', height: 28, minWidth: 180,
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: `${accent}30` },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${accent}70` },
+                    '& .MuiSelect-icon': { fontSize: 16 },
+                  }}
+                >
+                  <MenuItem value="" sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', color: 'text.disabled' }}>
+                    Default
                   </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-        ) : null}
+                  {models.map((m) => (
+                    <MenuItem key={m.id} value={m.id} sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Box sx={{
+                          width: 7, height: 7, borderRadius: '50%',
+                          bgcolor: PROVIDER_COLORS[m.provider] || '#888', flexShrink: 0,
+                        }} />
+                        {m.name}
+                        {m.is_default && (
+                          <Typography component="span" sx={{ fontSize: '0.55rem', color: 'text.disabled', fontFamily: '"Raleway", sans-serif' }}>
+                            (default)
+                          </Typography>
+                        )}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          ) : null}
         </Box>
 
         <Typography sx={{
@@ -744,7 +992,7 @@ export default function AnalyzeDashboard() {
         </Typography>
       </Box>
 
-      {/* ── drop zone (hidden once results arrive) and until models loaded ── */}
+      {/* ── drop zone (hidden once results arrive) ──────────────────────── */}
       {!result && (
         modelsLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
@@ -757,7 +1005,7 @@ export default function AnalyzeDashboard() {
         )
       )}
 
-      {/* ── run history (shown while no results are displayed and models loaded) ─ */}
+      {/* ── run history ─────────────────────────────────────────────────── */}
       {!result && !loading && !modelsLoading && !modelsError && (
         <RunOutputHistory
           onAnalyze={handleOutputAnalyze}
@@ -779,7 +1027,7 @@ export default function AnalyzeDashboard() {
         </Alert>
       )}
 
-      {/* ── success splash (brief, auto-dismisses before charts appear) ──── */}
+      {/* ── success splash ────────────────────────────────────────────────── */}
       {result && showSuccess && (
         <Box sx={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -810,8 +1058,7 @@ export default function AnalyzeDashboard() {
           animation: 'chartsIn 0.35s ease both',
         }}>
           {/* PDF download toolbar */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, mb: 2 }}>
-            {/* PDF success badge */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, mb: 3 }}>
             {pdfSuccess && (
               <Box sx={{
                 display: 'flex', alignItems: 'center', gap: 0.75,
@@ -849,9 +1096,24 @@ export default function AnalyzeDashboard() {
             </Button>
           </Box>
 
-          <SummaryBar result={result} filename={filename} />
+          {/* ── KPI stat row ─────────────────────────────────────────────────
+              Four to five cards depending on what data is available.
+              Each card gets a distinct colour stripe so the row is scannable
+              at a glance. The grid uses md (auto) so cards grow equally.     */}
+          <StatsRow result={result} />
 
-          {/* Captured area — charts grid only; header+summary added natively in PDF */}
+          {/* ── AI insights panel ────────────────────────────────────────────
+              Shows the full AI narrative, every analysed column as a chip,
+              and (when available) the prompt / completion / total token count
+              so users can track AI cost per analysis run.                    */}
+          <InsightsPanel result={result} filename={filename} />
+
+          {/* ── Charts section ───────────────────────────────────────────────
+              Ruled divider with chart count, then the 2-column chart grid.
+              Only the grid is captured for the PDF (chartsRef), not the
+              panels above — header + summary are added natively in the PDF.  */}
+          <SectionDivider label={`Visualisations · ${(result.charts || []).length} charts`} />
+
           <Box ref={chartsRef}>
             <Grid container spacing={2.5}>
               {(result.charts || []).map((spec) => (
