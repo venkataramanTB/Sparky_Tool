@@ -4,6 +4,7 @@ import os as _os
 import time as _time
 import uuid as _uuid
 import paramiko
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -75,17 +76,25 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sparky Tool", lifespan=lifespan)
 
-# CORS — open to all origins.
-# Security is enforced via Clerk JWT on every authenticated endpoint,
-# so CORS does not need to be the access-control layer here.
-# allow_credentials must stay False when allow_origins=["*"].
+# CORS — restrict to configured origins when CORS_ORIGINS env var is set.
+# Falls back to wildcard only when the value is explicitly "*" or unset.
+# Security is enforced via Clerk JWT on every authenticated endpoint.
+# allow_credentials must stay False when allow_origins includes "*".
+_cors_raw = settings.cors_origins or "*"
+if _cors_raw.strip() == "*":
+    _allowed_origins: list[str] = ["*"]
+    _allow_credentials = False
+else:
+    _allowed_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()] or ["*"]
+    _allow_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-    allow_credentials=False,
-    expose_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_credentials=_allow_credentials,
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -125,6 +134,33 @@ async def log_requests(request: Request, call_next):
 
 _cache: dict = {}
 _v2_enabled = False
+
+# ── In-memory rate limiter ────────────────────────────────────────────────────
+# Sliding-window: max 10 AI analysis uploads per IP per 60 seconds.
+_rate_buckets: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT = 10
+_RATE_WINDOW = 60.0
+
+_RATE_LIMITED_PATHS = {"/api/v2/insights/analyze-file"}
+
+
+@app.middleware("http")
+async def rate_limit_expensive_ops(request: Request, call_next):
+    if request.method == "POST" and request.url.path in _RATE_LIMITED_PATHS:
+        client_ip = (request.client.host if request.client else None) or "unknown"
+        now = _time.time()
+        bucket = _rate_buckets[client_ip]
+        # Prune timestamps outside the sliding window
+        _rate_buckets[client_ip] = [t for t in bucket if now - t < _RATE_WINDOW]
+        if len(_rate_buckets[client_ip]) >= _RATE_LIMIT:
+            return Response(
+                content='{"detail":"Rate limit exceeded — maximum 10 file analyses per minute per IP."}',
+                status_code=429,
+                media_type="application/json",
+                headers={"Retry-After": "60"},
+            )
+        _rate_buckets[client_ip].append(now)
+    return await call_next(request)
 
 # ── Wide-event middleware helpers ─────────────────────────────────────────────
 

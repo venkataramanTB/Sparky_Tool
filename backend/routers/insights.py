@@ -29,8 +29,10 @@ from pdf_generator import (
 log = get_logger("insights")
 router = APIRouter(prefix="/api/v2/insights", tags=["insights"])
 
-# backend/routers/insights.py  →  ../Output Files
 _OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "Output Files")
+
+_MAX_UPLOAD_BYTES = 100 * 1024 * 1024          # 100 MB
+_ALLOWED_UPLOAD_EXTENSIONS = {".csv", ".xlsx", ".xls", ".json"}
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -751,8 +753,20 @@ async def analyze_file(
     ai_model_id: int | None = Query(None),
 ):
     """Accept a CSV or Excel upload and return AI chart specs."""
-    raw   = await file.read()
     fname = file.filename or "upload"
+    ext = os.path.splitext(fname)[1].lower()
+    if ext not in _ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            415,
+            f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(_ALLOWED_UPLOAD_EXTENSIONS))}",
+        )
+
+    raw = await file.read()
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        size_mb = len(raw) / (1024 * 1024)
+        raise HTTPException(413, f"File too large ({size_mb:.1f} MB). Maximum allowed is 100 MB.")
+
+    log.info("analyze_file  user=%s  file=%s  size_kb=%.1f", user.id[:8], fname, len(raw) / 1024)
     return _run_analysis(raw, fname, user, db, ai_model_id)
 
 
