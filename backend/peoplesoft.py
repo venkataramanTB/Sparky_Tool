@@ -6,6 +6,27 @@ from logger import get_logger
 log = get_logger("peoplesoft")
 
 
+def _ps_error_body(response) -> str:
+    """Extract a meaningful error string from a PS 5xx response body.
+    Returns empty string when the body is absent/HTML (transient startup noise)."""
+    try:
+        text = response.text.strip()
+    except Exception:
+        return ""
+    if not text or text.startswith("<"):
+        return ""
+    try:
+        data = response.json()
+        return (
+            data.get("errorMessage")
+            or data.get("message")
+            or data.get("detail")
+            or text
+        )
+    except Exception:
+        return text
+
+
 def _build_url(base_url: str, endpoint: str) -> str:
     endpoint = endpoint.strip()
     if endpoint.startswith(("http://", "https://")):
@@ -64,15 +85,23 @@ def trigger_engine(_settings=None, max_retries: int = 6, retry_delay: int = 10) 
             )
 
             if response.status_code >= 500:
+                body = _ps_error_body(response)
+                if body:
+                    # PS returned a real error message — retrying won't help
+                    log.error("Trigger HTTP %s — PS error: %s", response.status_code, body)
+                    raise httpx.HTTPStatusError(
+                        f"PeopleSoft returned HTTP {response.status_code} — {body}",
+                        request=response.request, response=response,
+                    )
+                # Empty body — likely transient startup, retry
                 if attempt < max_retries:
                     log.warning(
-                        "Trigger returned HTTP %s — PS may still be queuing (attempt %d/%d), "
-                        "retrying in %ds",
+                        "Trigger returned HTTP %s with empty body — PS may still be starting "
+                        "(attempt %d/%d), retrying in %ds",
                         response.status_code, attempt, max_retries, retry_delay,
                     )
                     time.sleep(retry_delay)
                     continue
-                # All retries exhausted — surface the error
                 response.raise_for_status()
 
             response.raise_for_status()  # 4xx → raise immediately (auth/config error)
@@ -102,10 +131,17 @@ def poll_status(instance_id: str, _settings=None, max_wait: int = 600, poll_inte
             rtt = round((time.time() - t0) * 1000)
 
             # PeopleSoft returns 5xx while the process is still queued or running.
-            # Continue polling; only hard-fail on 4xx (auth/config errors).
+            # If PS includes an error body it's a real failure; otherwise keep polling.
             if response.status_code >= 500:
+                body = _ps_error_body(response)
+                if body:
+                    log.error("Poll HTTP %s — PS error: %s", response.status_code, body)
+                    raise httpx.HTTPStatusError(
+                        f"PeopleSoft returned HTTP {response.status_code} — {body}",
+                        request=response.request, response=response,
+                    )
                 log.warning(
-                    "Poll [%3ds elapsed]  HTTP %s — process still starting, will retry  (%d ms)",
+                    "Poll [%3ds elapsed]  HTTP %s — process still running, will retry  (%d ms)",
                     elapsed, response.status_code, rtt,
                 )
                 continue
