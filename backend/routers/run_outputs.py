@@ -1,6 +1,9 @@
+import asyncio
 import datetime
 import io
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -246,13 +249,13 @@ def diff_run_outputs(
 
 
 @router.post("/{output_id}/analyze")
-def analyze_run_output(
+async def analyze_run_output(
     output_id:   int,
     user:        User = Depends(get_current_user),
     db:          Session = Depends(get_db),
     ai_model_id: int | None = Query(None),
 ):
-    """Re-run AI analysis on a previously saved run output."""
+    """Re-run AI analysis on a previously saved run output — streamed via SSE."""
     row = db.query(RunOutput).filter(
         RunOutput.id == output_id, RunOutput.user_id == user.id
     ).first()
@@ -262,8 +265,44 @@ def analyze_run_output(
     log.info("analyze_run_output  id=%d  user=%s", output_id, user.id[:8])
 
     from routers.insights import _run_analysis
-    # Append .csv so _run_analysis uses the CSV parsing path
     fname = row.display_name if row.display_name.endswith(".csv") else row.display_name + ".csv"
-    result = _run_analysis(row.csv_content, fname, user, db, ai_model_id)
-    result["meta"]["run_output_id"] = output_id
-    return result
+    raw   = row.csv_content
+
+    async def event_stream():
+        box:  dict = {}
+        done = asyncio.Event()
+
+        async def worker():
+            try:
+                result = await asyncio.to_thread(_run_analysis, raw, fname, user, db, ai_model_id)
+                result["meta"]["run_output_id"] = output_id
+                box["result"] = result
+            except Exception as exc:
+                box["error"]       = exc.detail if isinstance(exc, HTTPException) else str(exc)
+                box["status_code"] = exc.status_code if isinstance(exc, HTTPException) else 500
+            finally:
+                done.set()
+
+        asyncio.create_task(worker())
+
+        while not done.is_set():
+            try:
+                await asyncio.wait_for(asyncio.shield(done.wait()), timeout=5.0)
+            except asyncio.TimeoutError:
+                yield b'data: {"status":"processing"}\n\n'
+
+        if "error" in box:
+            yield (
+                'data: ' +
+                json.dumps({"error": box["error"], "status_code": box.get("status_code", 500)}) +
+                '\n\n'
+            ).encode()
+        else:
+            yield ('data: ' + json.dumps(box["result"]) + '\n\n').encode()
+        yield b'data: [DONE]\n\n'
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )

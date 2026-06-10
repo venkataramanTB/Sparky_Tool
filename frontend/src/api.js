@@ -155,13 +155,58 @@ export async function downloadOperationalPdf(payload) {
   return data
 }
 
-export const analyzeFile = (file, aiModelId) => {
+// Shared SSE consumer for streaming AI analysis endpoints.
+// The backend sends {"status":"processing"} pings every 5 s while the AI model
+// is working, then emits the final result JSON as a single data line, followed
+// by the sentinel [DONE].  This keeps any proxy/load-balancer from closing the
+// otherwise-idle connection before the model finishes.
+async function _consumeSse(response) {
+  if (!response.ok) {
+    let body
+    try { body = await response.json() } catch { body = { detail: response.statusText } }
+    const err = Object.assign(new Error(body.detail || 'Request failed'), {
+      response: { data: body, status: response.status },
+    })
+    throw err
+  }
+  const reader  = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() ?? ''
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue
+      const raw = line.slice(6)
+      if (raw === '[DONE]') return
+      const msg = JSON.parse(raw)
+      if (msg.status === 'processing') continue
+      if (msg.error) {
+        const err = Object.assign(new Error(msg.error), {
+          response: { data: { detail: msg.error }, status: msg.status_code ?? 502 },
+        })
+        throw err
+      }
+      return { data: msg }  // same shape as an axios response — callers need no changes
+    }
+  }
+}
+
+export async function analyzeFile(file, aiModelId) {
   const form = new FormData()
   form.append('file', file)
-  const params = aiModelId != null ? { ai_model_id: aiModelId } : {}
-  // null removes the instance-default 'application/json' so Axios 1.7.x does NOT
-  // JSON-serialize the FormData; the browser then sets the correct multipart boundary.
-  return client.post('/v2/insights/analyze-file', form, { params, headers: { 'Content-Type': null }, timeout: 0 })
+  const qs   = aiModelId != null ? `?ai_model_id=${encodeURIComponent(aiModelId)}` : ''
+  const base = _origin ? `${_origin}/api` : '/api'
+  const token = _getToken ? await _getToken().catch(() => null) : null
+  const response = await fetch(`${base}/v2/insights/analyze-file${qs}`, {
+    method:  'POST',
+    body:    form,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  return _consumeSse(response)
 }
 
 // Analysis review + prompt reference library (v2)
@@ -177,9 +222,14 @@ export const deletePromptReference = (refId, token) =>
 // Run Outputs (v2)
 export const listRunOutputs    = (token, params = {})  => client.get('/v2/run-outputs/',               { headers: auth(token), params })
 export const deleteRunOutput   = (id, token)            => client.delete(`/v2/run-outputs/${id}`,       { headers: auth(token) })
-export const analyzeRunOutput  = (id, aiModelId, token) => {
-  const params = aiModelId != null ? { ai_model_id: aiModelId } : {}
-  return client.post(`/v2/run-outputs/${id}/analyze`, null, { params, headers: auth(token), timeout: 0 })
+export async function analyzeRunOutput(id, aiModelId, token) {
+  const qs   = aiModelId != null ? `?ai_model_id=${encodeURIComponent(aiModelId)}` : ''
+  const base = _origin ? `${_origin}/api` : '/api'
+  const response = await fetch(`${base}/v2/run-outputs/${id}/analyze${qs}`, {
+    method:  'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  return _consumeSse(response)
 }
 
 // AI Models admin (v2)

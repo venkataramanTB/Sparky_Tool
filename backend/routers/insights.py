@@ -751,12 +751,49 @@ async def analyze_file(
     db:          Session = Depends(get_db),
     ai_model_id: int | None = Query(None),
 ):
-    """Accept a CSV or Excel upload and return AI chart specs."""
+    """Accept a CSV or Excel upload and stream AI chart specs via Server-Sent Events."""
     raw   = await file.read()
     fname = file.filename or "upload"
-    # _run_analysis makes long blocking HTTP calls to the AI provider — run it in
-    # a thread so the event loop stays responsive for other requests while waiting.
-    return await asyncio.to_thread(_run_analysis, raw, fname, user, db, ai_model_id)
+
+    async def event_stream():
+        box:  dict = {}
+        done = asyncio.Event()
+
+        async def worker():
+            try:
+                box["result"] = await asyncio.to_thread(
+                    _run_analysis, raw, fname, user, db, ai_model_id
+                )
+            except Exception as exc:
+                box["error"]       = exc.detail if isinstance(exc, HTTPException) else str(exc)
+                box["status_code"] = exc.status_code if isinstance(exc, HTTPException) else 500
+            finally:
+                done.set()
+
+        asyncio.create_task(worker())
+
+        # Heartbeat every 5 s — keeps Render/nginx/proxies from closing the idle connection
+        while not done.is_set():
+            try:
+                await asyncio.wait_for(asyncio.shield(done.wait()), timeout=5.0)
+            except asyncio.TimeoutError:
+                yield b'data: {"status":"processing"}\n\n'
+
+        if "error" in box:
+            yield (
+                'data: ' +
+                json.dumps({"error": box["error"], "status_code": box.get("status_code", 500)}) +
+                '\n\n'
+            ).encode()
+        else:
+            yield ('data: ' + json.dumps(box["result"]) + '\n\n').encode()
+        yield b'data: [DONE]\n\n'
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 # ── PDF generation endpoints ──────────────────────────────────────────────────
