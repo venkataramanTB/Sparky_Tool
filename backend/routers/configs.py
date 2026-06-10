@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
 from auth import get_current_user
@@ -8,6 +8,7 @@ from database import get_db
 from models import User, UserConfig, UserConfigEngine, Engine, AuditEvent
 from encrypt import encrypt, decrypt
 from logger import get_logger
+from sanitize import strip_all_whitespace
 
 log = get_logger("configs")
 
@@ -50,6 +51,11 @@ class ConfigPayload(BaseModel):
     win_domain: str = ""
     # Engines — ordered list of engine IDs to run sequentially
     engine_ids: list[int] = []
+
+    @field_validator("ps_base_url", "ps_endpoint", "ps_status_endpoint", "ps_process_name")
+    @classmethod
+    def _no_whitespace(cls, v: str) -> str:
+        return strip_all_whitespace(v)
 
 
 def _get_engines(config_id: int, db: Session) -> list[dict]:

@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from logger import setup_logging, get_logger
 from config import get_settings
@@ -19,6 +19,7 @@ import sftp_client
 import scp_client
 from csv_parser import parse_and_compute
 from settings_manager import update_env
+from sanitize import strip_all_whitespace as _strip_ws
 
 # Initialise logging before anything that might emit a log record
 setup_logging()
@@ -360,6 +361,11 @@ class SettingsPayload(BaseModel):
     ps_webserver_path: str = ""
     cors_origins: str = "http://localhost:3000"
 
+    @field_validator("ps_base_url", "ps_endpoint", "ps_status_endpoint", "ps_process_name")
+    @classmethod
+    def _no_whitespace(cls, v: str) -> str:
+        return _strip_ws(v)
+
 
 @app.get("/api/settings")
 def get_settings_view():
@@ -392,6 +398,11 @@ class PeoplesoftTestPayload(BaseModel):
     ps_endpoint: str = ""
     ps_status_endpoint: str = ""
     ps_process_name: str = ""
+
+    @field_validator("ps_base_url", "ps_endpoint", "ps_status_endpoint", "ps_process_name")
+    @classmethod
+    def _no_whitespace(cls, v: str) -> str:
+        return _strip_ws(v)
 
 
 @app.post("/api/test-peoplesoft")
