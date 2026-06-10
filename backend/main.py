@@ -414,17 +414,24 @@ def test_peoplesoft(
     import json as _json
     from encrypt import decrypt as _decrypt
 
-    password = body.ps_password or settings.ps_password
-    username = body.ps_username or settings.ps_username
+    password = body.ps_password
+    username = body.ps_username
 
-    # When the frontend strips the "***" sentinel to "" but we have a config_id,
-    # look up the saved encrypted password directly from the DB.
-    if not password and body.config_id is not None:
+    # Config-based credentials take priority: the frontend sends config_id and
+    # strips the "***" sentinel to "" so we know to fetch the real password from DB.
+    if body.config_id is not None:
         cfg = db.get(UserConfig, body.config_id)
         if cfg and cfg.user_id == user.id:
-            password = _decrypt(cfg.ps_password_enc)
+            if not password:
+                password = _decrypt(cfg.ps_password_enc)
             if not username:
                 username = cfg.ps_username
+
+    # .env fallback only when no config is in use (v1 compatibility)
+    if not password:
+        password = settings.ps_password
+    if not username:
+        username = settings.ps_username
 
     endpoint = body.ps_endpoint.strip()
     if endpoint.startswith(("http://", "https://")):
