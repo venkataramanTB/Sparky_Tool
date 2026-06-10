@@ -687,7 +687,7 @@ def _run_analysis(raw: bytes, fname: str, user: "User", db: "Session", ai_model_
         "total_columns":    profile["total_columns"],
         "sheet_count":      sheet_count,
         "columns":          [c["name"] for c in profile["columns"]],
-        "column_profiles":  profile.get("columns", []),
+        "column_profiles":  masker.demask_obj(masked_profile.get("columns", [])),
         "conversation_id":  conversation_id,
         "pii_protected":    masker.masked_count > 0,
         "pii_masked_count": masker.masked_count,
