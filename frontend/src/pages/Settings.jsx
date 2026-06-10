@@ -257,6 +257,7 @@ export default function Settings() {
     setPsTestStatus('testing')
     try {
       const res = await testPeoplesoft({
+        config_id: selectedConfigId,
         ps_base_url: form.ps_base_url, ps_auth_type: form.ps_auth_type,
         ps_username: form.ps_username, ps_password: livePass(form.ps_password),
         ps_endpoint: form.ps_endpoint, ps_status_endpoint: form.ps_status_endpoint,

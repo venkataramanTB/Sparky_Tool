@@ -384,6 +384,7 @@ def get_settings_view():
 
 
 class PeoplesoftTestPayload(BaseModel):
+    config_id: int | None = None
     ps_base_url: str = ""
     ps_auth_type: str = "basic"
     ps_username: str = ""
@@ -394,11 +395,25 @@ class PeoplesoftTestPayload(BaseModel):
 
 
 @app.post("/api/test-peoplesoft")
-def test_peoplesoft(body: PeoplesoftTestPayload):
+def test_peoplesoft(
+    body: PeoplesoftTestPayload,
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
     import json as _json
+    from encrypt import decrypt as _decrypt
 
     password = body.ps_password or settings.ps_password
     username = body.ps_username or settings.ps_username
+
+    # When the frontend strips the "***" sentinel to "" but we have a config_id,
+    # look up the saved encrypted password directly from the DB.
+    if not password and body.config_id is not None:
+        cfg = db.get(UserConfig, body.config_id)
+        if cfg and cfg.user_id == user.id:
+            password = _decrypt(cfg.ps_password_enc)
+            if not username:
+                username = cfg.ps_username
 
     endpoint = body.ps_endpoint.strip()
     if endpoint.startswith(("http://", "https://")):
