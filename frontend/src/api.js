@@ -92,6 +92,7 @@ export const createConfig  = (payload, token)           => client.post('/v2/conf
 export const getConfig     = (id, token)                => client.get(`/v2/configs/${id}`,     { headers: auth(token) })
 export const updateConfig  = (id, payload, token)       => client.put(`/v2/configs/${id}`,     payload, { headers: auth(token) })
 export const deleteConfig  = (id, token)                => client.delete(`/v2/configs/${id}`,  { headers: auth(token) })
+export const getConfigSecrets = (id)                   => client.get(`/v2/configs/${id}/secrets`)
 
 // Runs (v2)
 export const runConfig  = (configId, token)             => client.post(`/v2/run/${configId}`,  null, { headers: auth(token) })

@@ -15,7 +15,7 @@ import DnsIcon        from '@mui/icons-material/Dns'
 import StorageIcon    from '@mui/icons-material/Storage'
 import { useAuth } from '../AuthContext'
 import { useThemeContext } from '../ThemeContext'
-import { listConfigs, createConfig, updateConfig, deleteConfig, testRetrieval, testPeoplesoft, testWindows, testFtp, listEngines, formatApiError } from '../api'
+import { listConfigs, createConfig, updateConfig, deleteConfig, testRetrieval, testPeoplesoft, testWindows, testFtp, listEngines, formatApiError, getConfigSecrets } from '../api'
 import WinServerBrowser from '../components/WinServerBrowser'
 import FtpBrowser from '../components/FtpBrowser'
 import MythicsLoader from '../components/MythicsLoader'
@@ -124,6 +124,8 @@ export default function Settings() {
   const [error, setError]                   = useState(null)
   const [showPsPass, setShowPsPass]         = useState(false)
   const [showSftpPass, setShowSftpPass]     = useState(false)
+  const [secretsFetched, setSecretsFetched] = useState(false)
+  const [revealLoading, setRevealLoading]   = useState(false)
   const [testStatus, setTestStatus]         = useState(null)
   const [psTestStatus, setPsTestStatus]     = useState(null)
   const [psBodyOpen, setPsBodyOpen]         = useState(false)
@@ -161,6 +163,12 @@ export default function Settings() {
   }, [token])
 
   const handleSelectConfig = (configId, list = configs) => {
+    setSecretsFetched(false)
+    setRevealLoading(false)
+    setShowPsPass(false)
+    setShowSftpPass(false)
+    setShowWinPass(false)
+    setShowFtpPass(false)
     if (configId === 'new') { setSelectedConfigId(null); setForm(EMPTY); return }
     const config = list.find((item) => item.id === configId)
     if (!config) return
@@ -345,11 +353,36 @@ export default function Settings() {
     } finally { setSaving(false) }
   }
 
+  const handleReveal = async () => {
+    if (secretsFetched || !selectedConfigId) return
+    setRevealLoading(true)
+    try {
+      const { data } = await getConfigSecrets(selectedConfigId)
+      setForm(f => ({
+        ...f,
+        ps_password:   data.ps_password   || f.ps_password,
+        sftp_password: data.sftp_password || f.sftp_password,
+        ftp_password:  data.ftp_password  || f.ftp_password,
+        win_password:  data.win_password  || f.win_password,
+      }))
+      setSecretsFetched(true)
+    } catch {
+      setError('Could not retrieve saved passwords. Please try again.')
+    } finally {
+      setRevealLoading(false)
+    }
+  }
+
+  const revealToggle = (field, toggle) => async () => {
+    if (form[field] === '***' && !secretsFetched) await handleReveal()
+    toggle()
+  }
+
   const passAdornment = (show, toggle) => ({
     endAdornment: (
       <InputAdornment position="end">
         <IconButton size="small" onClick={toggle} sx={{ color: 'text.disabled', '&:hover': { color: accent } }}>
-          {show ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+          {revealLoading ? <CircularProgress size={14} sx={{ color: accent }} /> : show ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
         </IconButton>
       </InputAdornment>
     ),
@@ -566,11 +599,11 @@ export default function Settings() {
               <TextField fullWidth size="small" value={form.ps_username} onChange={set('ps_username')} sx={inputSx} />
             </Field>
             <Field label="Password">
-              <TextField fullWidth size="small" type={showPsPass ? 'text' : 'password'} value={form.ps_password} onChange={set('ps_password')} sx={inputSx} InputProps={passAdornment(showPsPass, () => setShowPsPass((p) => !p))} />
+              <TextField fullWidth size="small" type={showPsPass ? 'text' : 'password'} value={form.ps_password} onChange={set('ps_password')} sx={inputSx} InputProps={passAdornment(showPsPass, revealToggle('ps_password', () => setShowPsPass((p) => !p)))} />
             </Field>
           </>) : (
             <Field label="Bearer token">
-              <TextField fullWidth size="small" type={showPsPass ? 'text' : 'password'} value={form.ps_password} onChange={set('ps_password')} sx={inputSx} InputProps={passAdornment(showPsPass, () => setShowPsPass((p) => !p))} />
+              <TextField fullWidth size="small" type={showPsPass ? 'text' : 'password'} value={form.ps_password} onChange={set('ps_password')} sx={inputSx} InputProps={passAdornment(showPsPass, revealToggle('ps_password', () => setShowPsPass((p) => !p)))} />
             </Field>
           )}
 
@@ -660,7 +693,7 @@ export default function Settings() {
               <TextField fullWidth size="small" value={form.sftp_username} onChange={set('sftp_username')} autoComplete="off" sx={inputSx} />
             </Field>
             <Field label="Password">
-              <TextField fullWidth size="small" type={showSftpPass ? 'text' : 'password'} value={form.sftp_password} onChange={set('sftp_password')} autoComplete="new-password" InputProps={passAdornment(showSftpPass, () => setShowSftpPass((p) => !p))} sx={inputSx} />
+              <TextField fullWidth size="small" type={showSftpPass ? 'text' : 'password'} value={form.sftp_password} onChange={set('sftp_password')} autoComplete="new-password" InputProps={passAdornment(showSftpPass, revealToggle('sftp_password', () => setShowSftpPass((p) => !p)))} sx={inputSx} />
             </Field>
           </>)}
 
@@ -769,7 +802,7 @@ export default function Settings() {
           </Field>
           <Field label="Password">
             <TextField fullWidth size="small" type={showWinPass ? 'text' : 'password'} value={form.win_password} onChange={set('win_password')} autoComplete="new-password"
-              InputProps={passAdornment(showWinPass, () => setShowWinPass((p) => !p))} sx={inputSx} />
+              InputProps={passAdornment(showWinPass, revealToggle('win_password', () => setShowWinPass((p) => !p)))} sx={inputSx} />
           </Field>
 
           {/* WinRM-specific */}
@@ -924,7 +957,7 @@ export default function Settings() {
           </Field>
           <Field label="Password">
             <TextField fullWidth size="small" type={showFtpPass ? 'text' : 'password'} value={form.ftp_password} onChange={set('ftp_password')} autoComplete="new-password"
-              InputProps={passAdornment(showFtpPass, () => setShowFtpPass((p) => !p))} sx={inputSx} />
+              InputProps={passAdornment(showFtpPass, revealToggle('ftp_password', () => setShowFtpPass((p) => !p)))} sx={inputSx} />
           </Field>
 
           <Box sx={{ gridColumn: '1 / -1' }}>

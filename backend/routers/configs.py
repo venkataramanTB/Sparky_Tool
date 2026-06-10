@@ -190,6 +190,26 @@ def get_config(
     return _serialize(config, db)
 
 
+@router.get("/{config_id}/secrets")
+def get_config_secrets(
+    config_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    config = db.query(UserConfig).filter(
+        UserConfig.id == config_id, UserConfig.user_id == user.id
+    ).first()
+    if not config:
+        raise HTTPException(404, "Configuration not found")
+    log.debug("get_config_secrets  id=%d  user=%s", config_id, user.id[:8])
+    return {
+        "ps_password":   decrypt(config.ps_password_enc),
+        "sftp_password": decrypt(config.sftp_password_enc),
+        "ftp_password":  decrypt(config.ftp_password_enc  or ""),
+        "win_password":  decrypt(config.win_password_enc  or ""),
+    }
+
+
 @router.put("/{config_id}")
 def update_config(
     config_id: int,
