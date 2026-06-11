@@ -758,6 +758,10 @@ export default function RunAnalyseDashboard() {
 
   const inProgress = phase === 'running' || phase === 'analysing'
 
+  const _urlMatch = error ? error.match(/\(url:\s*(https?:\/\/[^)]+)\)/) : null
+  const errorUrl  = _urlMatch?.[1] || null
+  const errorMsg  = errorUrl ? error.replace(/\s*\(url:\s*https?:\/\/[^)]+\)/, '').trim() : (error || '')
+
   return (
     <Box>
       {/* Toolbar */}
@@ -841,7 +845,26 @@ export default function RunAnalyseDashboard() {
       {/* Error alert */}
       {phase === 'error' && error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
-          {error}
+          <Typography sx={{ fontSize: '0.88rem', mb: errorUrl ? 1 : 0 }}>{errorMsg}</Typography>
+          {errorUrl && (
+            <Box sx={{
+              display: 'flex', alignItems: 'center', gap: 1,
+              mt: 0.75, px: 1.5, py: 0.75,
+              bgcolor: 'rgba(180,80,80,0.08)',
+              border: '1px solid rgba(180,80,80,0.2)',
+              borderRadius: '3px', overflow: 'hidden',
+            }}>
+              <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.6rem', fontWeight: 700, color: '#c98f8f', flexShrink: 0 }}>
+                URL
+              </Typography>
+              <Typography
+                title={errorUrl}
+                sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.65rem', color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}
+              >
+                {errorUrl}
+              </Typography>
+            </Box>
+          )}
         </Alert>
       )}
 
