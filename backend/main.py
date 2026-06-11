@@ -494,9 +494,11 @@ def test_peoplesoft(
             status_body_str = None
 
             if body.ps_status_endpoint and instance_id:
-                status_ep = body.ps_status_endpoint.strip()
+                import re as _re
+                # Strip trailing {InstanceID} placeholders copied verbatim from Postman URLs
+                status_ep = _re.sub(r"/?\{[^}]+\}$", "", body.ps_status_endpoint.strip().rstrip("/"))
                 if status_ep.startswith(("http://", "https://")):
-                    status_url_used = status_ep.rstrip("/")
+                    status_url_used = status_ep
                 else:
                     sbase = body.ps_base_url.rstrip("/")
                     if not status_ep.startswith("/"):

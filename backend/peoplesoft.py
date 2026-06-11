@@ -122,7 +122,11 @@ def trigger_engine(_settings=None, max_retries: int = 6, retry_delay: int = 10) 
 
 def poll_status(instance_id: str, _settings=None, max_wait: int = 600, poll_interval: int = 5) -> dict:
     settings = _settings or get_settings()
-    base_url = _build_url(settings.ps_base_url, settings.ps_status_endpoint)
+    # Strip any {InstanceID} or similar template placeholders users may have
+    # copied verbatim from Postman URLs — e.g. ".../API/{InstanceID}" → ".../API"
+    import re as _re
+    status_ep = _re.sub(r"/?\{[^}]+\}$", "", (settings.ps_status_endpoint or "").rstrip("/"))
+    base_url = _build_url(settings.ps_base_url, status_ep)
     url = f"{base_url.rstrip('/')}/{instance_id}" if instance_id else base_url.rstrip("/")
     auth, headers = _build_auth(settings)
     log.info("Polling status  GET %s  (max wait: %ds, interval: %ds)", url, max_wait, poll_interval)
