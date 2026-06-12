@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button,
-  Select, MenuItem, FormControl, CircularProgress, Alert,
+  Select, MenuItem, CircularProgress, Alert,
   LinearProgress, Tooltip, Divider, IconButton,
 } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
 import FlashOnIcon        from '@mui/icons-material/FlashOn'
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
 import CloudDownloadIcon  from '@mui/icons-material/CloudDownload'
@@ -16,7 +15,6 @@ import WarningAmberIcon   from '@mui/icons-material/WarningAmber'
 import ReplayIcon         from '@mui/icons-material/Replay'
 import StorageIcon        from '@mui/icons-material/Storage'
 import ViewColumnIcon     from '@mui/icons-material/ViewColumn'
-import PlayArrowIcon      from '@mui/icons-material/PlayArrow'
 import TaskAltIcon        from '@mui/icons-material/TaskAlt'
 import VerifiedIcon       from '@mui/icons-material/VerifiedUser'
 import BarChartIcon       from '@mui/icons-material/BarChart'
@@ -24,12 +22,13 @@ import {
   runConfig, analyzeRunOutput, listRuns,
   listInsightModels, listConfigs, formatApiError,
 } from '../api'
-import { useAuth } from '../AuthContext'
+import { useAuth }         from '../AuthContext'
 import { useThemeContext } from '../ThemeContext'
-import DataTable from '../components/DataTable'
-import { ChartCard } from '../components/DynamicChart'
+import DataTable           from '../components/DataTable'
+import MultiSectionReport  from '../components/MultiSectionReport'
+import { ChartCard }       from '../components/DynamicChart'
 
-// ── constants ──────────────────────────────────────────────────────────────────
+// ── constants ─────────────────────────────────────────────────────────────────
 
 const STEPS = [
   { label: 'Submitting to PeopleSoft', Icon: FlashOnIcon },
@@ -45,19 +44,20 @@ function fmtMs(ms) {
   return `${(ms / 60000).toFixed(1)} min`
 }
 
-// ── AnimatedRings ──────────────────────────────────────────────────────────────
+// ── AnimatedRings ─────────────────────────────────────────────────────────────
 
-function AnimatedRings({ accent }) {
+function AnimatedRings({ accent, size = 140 }) {
+  const rings = [0, 1, 2]
   return (
     <Box sx={{
-      position: 'relative', width: 140, height: 140,
+      position: 'relative', width: size, height: size,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      {[0, 1, 2].map((i) => (
+      {rings.map((i) => (
         <Box key={i} sx={{
           position: 'absolute',
-          width:  140 - i * 28,
-          height: 140 - i * 28,
+          width:  size - i * (size * 0.2),
+          height: size - i * (size * 0.2),
           borderRadius: '50%',
           border: `1.5px solid ${accent}`,
           opacity: 0.3 + i * 0.08,
@@ -70,12 +70,12 @@ function AnimatedRings({ accent }) {
           animationDelay: `${i * 0.22}s`,
         }} />
       ))}
-      <AutoAwesomeIcon sx={{ fontSize: 36, color: accent, zIndex: 1 }} />
+      <AutoAwesomeIcon sx={{ fontSize: size * 0.26, color: accent, zIndex: 1 }} />
     </Box>
   )
 }
 
-// ── StepTracker ────────────────────────────────────────────────────────────────
+// ── StepTracker ───────────────────────────────────────────────────────────────
 
 function StepTracker({ activeStep, completedSteps, accent }) {
   return (
@@ -98,16 +98,12 @@ function StepTracker({ activeStep, completedSteps, accent }) {
               }
             </Box>
             <Typography sx={{
-              fontSize: '0.78rem',
-              fontFamily: '"Raleway", sans-serif',
+              fontSize: '0.78rem', fontFamily: '"Raleway", sans-serif',
               fontWeight: done || active ? 600 : 400,
               color: done ? 'text.primary' : active ? accent : 'text.disabled',
               transition: 'color 0.3s ease',
               ...(active && {
-                '@keyframes stepBlink': {
-                  '0%, 100%': { opacity: 1 },
-                  '50%':      { opacity: 0.5 },
-                },
+                '@keyframes stepBlink': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.5 } },
                 animation: 'stepBlink 1.4s ease-in-out infinite',
               }),
             }}>
@@ -120,14 +116,14 @@ function StepTracker({ activeStep, completedSteps, accent }) {
   )
 }
 
-// ── LoadingView ────────────────────────────────────────────────────────────────
+// ── LoadingView ───────────────────────────────────────────────────────────────
 
-function LoadingView({ activeStep, completedSteps, phase, elapsed, accent }) {
+function LoadingView({ activeStep, completedSteps, phase, elapsed, accent, modelName }) {
   const progress = Math.min(95,
     completedSteps.size / STEPS.length * 90 + (phase === 'analysing' ? 12 : 0)
   )
   const phaseLabel = phase === 'analysing'
-    ? 'Analysing data with Gemini AI…'
+    ? `Analysing data${modelName ? ` with ${modelName}` : ''}…`
     : 'PeopleSoft run in progress…'
   const mins = Math.floor(elapsed / 60)
   const secs = String(elapsed % 60).padStart(2, '0')
@@ -178,11 +174,11 @@ function LoadingView({ activeStep, completedSteps, phase, elapsed, accent }) {
   )
 }
 
-// ── SectionHeader ──────────────────────────────────────────────────────────────
+// ── SectionHeader ─────────────────────────────────────────────────────────────
 
-function SectionHeader({ Icon, label, accent, sub, subColor }) {
+function SectionHeader({ Icon, label, accent, sub, subColor, mt }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, mt: 4 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, mt: mt ?? 4 }}>
       <Box sx={{ width: 1, height: 20, bgcolor: accent, opacity: 0.7, flexShrink: 0 }} />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
         <Icon sx={{ fontSize: 16, color: accent }} />
@@ -205,7 +201,7 @@ function SectionHeader({ Icon, label, accent, sub, subColor }) {
   )
 }
 
-// ── RunMetaBar ─────────────────────────────────────────────────────────────────
+// ── RunMetaBar ────────────────────────────────────────────────────────────────
 
 function RunMetaBar({ runResult, accent }) {
   const fields = [
@@ -242,7 +238,7 @@ function RunMetaBar({ runResult, accent }) {
   )
 }
 
-// ── AIInsightsPanel ────────────────────────────────────────────────────────────
+// ── AIInsightsPanel ───────────────────────────────────────────────────────────
 
 function AIInsightsPanel({ analysisResult, accent }) {
   const sections = analysisResult?.sections || {}
@@ -250,7 +246,6 @@ function AIInsightsPanel({ analysisResult, accent }) {
 
   return (
     <Box>
-      {/* Executive Summary */}
       {sections.executive_summary && (
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', mb: 2.5 }}>
           <CardContent sx={{ p: 3 }}>
@@ -270,7 +265,6 @@ function AIInsightsPanel({ analysisResult, accent }) {
         </Card>
       )}
 
-      {/* Key Findings + Recommendations */}
       <Grid container spacing={2.5} sx={{ mb: 2.5 }}>
         {sections.key_findings?.length > 0 && (
           <Grid item xs={12} md={6}>
@@ -330,7 +324,6 @@ function AIInsightsPanel({ analysisResult, accent }) {
         )}
       </Grid>
 
-      {/* Anomalies */}
       {sections.anomalies?.length > 0 && (
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'rgba(201,168,76,0.22)', mb: 2.5 }}>
           <CardContent sx={{ p: 3 }}>
@@ -346,9 +339,7 @@ function AIInsightsPanel({ analysisResult, accent }) {
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {sections.anomalies.map((anomaly, i) => (
                 <Chip
-                  key={i}
-                  label={anomaly}
-                  size="small"
+                  key={i} label={anomaly} size="small"
                   sx={{
                     bgcolor: 'rgba(201,168,76,0.1)', color: '#c9a84c',
                     fontSize: '0.72rem', height: 'auto', py: 0.5,
@@ -361,7 +352,6 @@ function AIInsightsPanel({ analysisResult, accent }) {
         </Card>
       )}
 
-      {/* AI summary paragraph */}
       {analysisResult?.summary && (
         <Typography sx={{
           fontSize: '0.82rem', color: 'text.secondary', lineHeight: 1.75,
@@ -374,7 +364,6 @@ function AIInsightsPanel({ analysisResult, accent }) {
         </Typography>
       )}
 
-      {/* Charts */}
       {charts.length > 0 && (
         <Box>
           <SectionHeader Icon={BarChartIcon} label="AI-Generated Charts" accent={accent} sub={`${charts.length} charts`} />
@@ -391,7 +380,7 @@ function AIInsightsPanel({ analysisResult, accent }) {
   )
 }
 
-// ── ColumnCard ─────────────────────────────────────────────────────────────────
+// ── ColumnCard ────────────────────────────────────────────────────────────────
 
 function ColumnCard({ col, accent }) {
   const isNumeric  = 'min' in col
@@ -409,7 +398,6 @@ function ColumnCard({ col, accent }) {
   return (
     <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%' }}>
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-        {/* Name + dtype */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
           <Typography sx={{
             fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem',
@@ -424,7 +412,6 @@ function ColumnCard({ col, accent }) {
           />
         </Box>
 
-        {/* Null % + Unique */}
         <Box sx={{ display: 'flex', gap: 2, mb: 1.5 }}>
           <Box sx={{ flex: 1 }}>
             <Typography sx={{ fontSize: '0.52rem', letterSpacing: '0.16em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.4 }}>
@@ -495,7 +482,7 @@ function ColumnCard({ col, accent }) {
   )
 }
 
-// ── ColumnDeepDive ─────────────────────────────────────────────────────────────
+// ── ColumnDeepDive ────────────────────────────────────────────────────────────
 
 function ColumnDeepDive({ profiles, accent }) {
   return (
@@ -512,7 +499,7 @@ function ColumnDeepDive({ profiles, accent }) {
   )
 }
 
-// ── DQPanel ────────────────────────────────────────────────────────────────────
+// ── DQPanel ───────────────────────────────────────────────────────────────────
 
 function DQPanel({ dqResults, accent }) {
   const passed = dqResults.filter((r) => r.passed).length
@@ -521,9 +508,7 @@ function DQPanel({ dqResults, accent }) {
   return (
     <Box>
       <SectionHeader
-        Icon={VerifiedIcon}
-        label="Data Quality"
-        accent={accent}
+        Icon={VerifiedIcon} label="Data Quality" accent={accent}
         sub={`${passed} passed · ${failed} failed`}
         subColor={failed > 0 ? '#b45050' : '#6b8f71'}
       />
@@ -549,8 +534,7 @@ function DQPanel({ dqResults, accent }) {
               {rule.message}
             </Typography>
             <Chip
-              label={rule.passed ? 'pass' : 'fail'}
-              size="small"
+              label={rule.passed ? 'pass' : 'fail'} size="small"
               sx={{
                 bgcolor: rule.passed ? 'rgba(107,143,113,0.14)' : 'rgba(180,80,80,0.14)',
                 color:   rule.passed ? '#6b8f71' : '#b45050',
@@ -564,7 +548,7 @@ function DQPanel({ dqResults, accent }) {
   )
 }
 
-// ── ResultsView ────────────────────────────────────────────────────────────────
+// ── ResultsView ───────────────────────────────────────────────────────────────
 
 function ResultsView({ runResult, analysisResult, accent }) {
   const meta           = analysisResult?.meta || {}
@@ -572,9 +556,17 @@ function ResultsView({ runResult, analysisResult, accent }) {
   const dqResults      = runResult?.dq_results || []
   const rows           = runResult?.rows    || []
   const columns        = runResult?.columns || []
+  const isMultiSection = runResult?.report_type === 'multi_section'
+  const hasDataset     = isMultiSection ? (runResult?.sections?.length > 0) : rows.length > 0
 
   return (
-    <Box>
+    <Box sx={{
+      '@keyframes fadeUp': {
+        from: { opacity: 0, transform: 'translateY(14px)' },
+        to:   { opacity: 1, transform: 'translateY(0)' },
+      },
+      animation: 'fadeUp 0.45s cubic-bezier(0.16,1,0.3,1) both',
+    }}>
       <RunMetaBar runResult={runResult} accent={accent} />
 
       {meta.pii_protected && (
@@ -592,7 +584,7 @@ function ResultsView({ runResult, analysisResult, accent }) {
       )}
 
       {/* AI narrative + charts */}
-      <SectionHeader Icon={AutoAwesomeIcon} label="AI Insights" accent={accent} />
+      <SectionHeader Icon={AutoAwesomeIcon} label="AI Insights" accent={accent} mt={0} />
       <AIInsightsPanel analysisResult={analysisResult} accent={accent} />
 
       {/* Column profiles */}
@@ -611,24 +603,30 @@ function ResultsView({ runResult, analysisResult, accent }) {
         </>
       )}
 
-      {/* Full data table */}
-      {rows.length > 0 && (
+      {/* Full dataset */}
+      {hasDataset && (
         <>
           <Divider sx={{ my: 4 }} />
           <SectionHeader
             Icon={StorageIcon}
             label="Full Dataset"
             accent={accent}
-            sub={`${rows.length.toLocaleString()} rows · ${columns.length} columns`}
+            sub={isMultiSection
+              ? `${runResult.sections.filter((s) => s.type === 'table').length} tables`
+              : `${rows.length.toLocaleString()} rows · ${columns.length} columns`
+            }
           />
-          <DataTable rows={rows} columns={columns} />
+          {isMultiSection
+            ? <MultiSectionReport sections={runResult.sections} />
+            : <DataTable rows={rows} columns={columns} />
+          }
         </>
       )}
     </Box>
   )
 }
 
-// ── RunAnalyseDashboard ────────────────────────────────────────────────────────
+// ── RunAnalyseDashboard ───────────────────────────────────────────────────────
 
 export default function RunAnalyseDashboard() {
   const { token }        = useAuth()
@@ -651,7 +649,6 @@ export default function RunAnalyseDashboard() {
   const timerRef   = useRef(null)
   const startTsRef = useRef(null)
 
-  // Load configs + models on mount
   useEffect(() => {
     if (!token) return
     Promise.all([listConfigs(token), listInsightModels()])
@@ -668,7 +665,6 @@ export default function RunAnalyseDashboard() {
       .finally(() => setInitLoading(false))
   }, [token])
 
-  // Cleanup on unmount
   useEffect(() => () => {
     clearInterval(pollRef.current)
     clearInterval(timerRef.current)
@@ -687,12 +683,10 @@ export default function RunAnalyseDashboard() {
 
     startTsRef.current = Date.now()
 
-    // Elapsed timer — updates every second
     timerRef.current = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startTsRef.current) / 1000))
     }, 1000)
 
-    // Polling loop — watches run list for step progression
     let lastInstanceId = ''
     let lastReportId   = ''
 
@@ -722,7 +716,6 @@ export default function RunAnalyseDashboard() {
     }, 2000)
 
     try {
-      // Long-running blocking POST — waits for PS + FTP + parse (~2–10 min)
       const { data: runData } = await runConfig(activeConfigId, token)
       clearInterval(pollRef.current)
 
@@ -757,6 +750,7 @@ export default function RunAnalyseDashboard() {
   }, [activeConfigId, selectedModelId, token, phase])
 
   const inProgress = phase === 'running' || phase === 'analysing'
+  const selectedModel = models.find((m) => m.id === selectedModelId)
 
   const _urlMatch = error ? error.match(/\(url:\s*(https?:\/\/[^)]+)\)/) : null
   const errorUrl  = _urlMatch?.[1] || null
@@ -765,63 +759,81 @@ export default function RunAnalyseDashboard() {
   return (
     <Box>
       {/* Toolbar */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4, flexWrap: 'wrap' }}>
+      <Box sx={{
+        display: 'flex', alignItems: 'center', gap: 1.5, mb: 4,
+        flexWrap: 'wrap',
+      }}>
         {initLoading ? (
           <CircularProgress size={20} sx={{ color: accent }} />
         ) : (
           <>
-            <FormControl size="small" sx={{ minWidth: 220 }}>
+            <Select
+              value={activeConfigId || ''}
+              onChange={(e) => setActiveConfigId(e.target.value)}
+              disabled={inProgress}
+              displayEmpty
+              size="small"
+              sx={{
+                minWidth: 210,
+                fontFamily: '"Raleway", sans-serif',
+                fontSize: '0.8rem',
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+                '& .MuiSelect-select': { py: 1.15 },
+              }}
+            >
+              {!configs.length && <MenuItem value="" disabled>No configurations</MenuItem>}
+              {configs.map((c) => (
+                <MenuItem key={c.id} value={c.id} sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem' }}>
+                  {c.name}
+                </MenuItem>
+              ))}
+            </Select>
+
+            {models.length > 0 && (
               <Select
-                value={activeConfigId || ''}
-                onChange={(e) => setActiveConfigId(e.target.value)}
+                value={selectedModelId || ''}
+                onChange={(e) => setSelectedModelId(e.target.value)}
                 disabled={inProgress}
-                displayEmpty
-                sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', borderRadius: '2px' }}
+                size="small"
+                sx={{
+                  minWidth: 175,
+                  fontFamily: '"Raleway", sans-serif',
+                  fontSize: '0.8rem',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+                  '& .MuiSelect-select': { py: 1.15 },
+                }}
               >
-                {!configs.length && <MenuItem value="" disabled>No configurations</MenuItem>}
-                {configs.map((c) => (
-                  <MenuItem key={c.id} value={c.id} sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' }}>
-                    {c.name}
+                {models.map((m) => (
+                  <MenuItem key={m.id} value={m.id} sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem' }}>
+                    {m.name || m.model_id}
                   </MenuItem>
                 ))}
               </Select>
-            </FormControl>
-
-            {models.length > 0 && (
-              <FormControl size="small" sx={{ minWidth: 180 }}>
-                <Select
-                  value={selectedModelId || ''}
-                  onChange={(e) => setSelectedModelId(e.target.value)}
-                  disabled={inProgress}
-                  displayEmpty
-                  sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', borderRadius: '2px' }}
-                >
-                  {models.map((m) => (
-                    <MenuItem key={m.id} value={m.id} sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' }}>
-                      {m.name || m.model_id}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
             )}
 
             <Button
-              variant="contained"
-              size="small"
               startIcon={inProgress
-                ? <CircularProgress size={14} sx={{ color: 'inherit' }} />
-                : <PlayArrowIcon />
+                ? <CircularProgress size={13} sx={{ color: 'background.default' }} />
+                : <AutoAwesomeIcon sx={{ fontSize: 16 }} />
               }
               onClick={handleRun}
               disabled={inProgress || !activeConfigId}
               sx={{
+                bgcolor: 'primary.main',
+                color: 'background.default',
                 fontFamily: '"Raleway", sans-serif',
-                fontSize: '0.72rem', letterSpacing: '0.14em',
-                textTransform: 'uppercase', borderRadius: '2px',
-                px: 2.5, py: 1,
-                bgcolor: accent,
-                '&:hover': { bgcolor: `${accent}cc` },
-                '&.Mui-disabled': { bgcolor: `${accent}44` },
+                fontWeight: 700,
+                fontSize: '0.72rem',
+                letterSpacing: '0.14em',
+                px: 3,
+                py: 1.2,
+                borderRadius: '2px',
+                boxShadow: `0 2px 20px ${accent}35`,
+                '&:hover': { bgcolor: 'primary.light', boxShadow: `0 4px 28px ${accent}55` },
+                '&.Mui-disabled': { opacity: 0.45 },
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
+                textTransform: 'none',
               }}
             >
               {inProgress ? 'Running…' : 'Run & Analyse'}
@@ -842,7 +854,7 @@ export default function RunAnalyseDashboard() {
         )}
       </Box>
 
-      {/* Error alert */}
+      {/* Error */}
       {phase === 'error' && error && (
         <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 3 }}>
           <Typography sx={{ fontSize: '0.88rem', mb: errorUrl ? 1 : 0 }}>{errorMsg}</Typography>
@@ -868,7 +880,7 @@ export default function RunAnalyseDashboard() {
         </Alert>
       )}
 
-      {/* Loading view */}
+      {/* Loading */}
       {inProgress && (
         <LoadingView
           activeStep={activeStep}
@@ -876,31 +888,51 @@ export default function RunAnalyseDashboard() {
           phase={phase}
           elapsed={elapsed}
           accent={accent}
+          modelName={selectedModel?.name || selectedModel?.model_id || null}
         />
       )}
 
-      {/* Results view */}
+      {/* Results */}
       {phase === 'done' && runResult && analysisResult && (
-        <ResultsView
-          runResult={runResult}
-          analysisResult={analysisResult}
-          accent={accent}
-        />
+        <ResultsView runResult={runResult} analysisResult={analysisResult} accent={accent} />
       )}
 
-      {/* Idle state */}
+      {/* Idle */}
       {phase === 'idle' && (
         <Box sx={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', minHeight: 400, gap: 2, opacity: 0.45,
+          justifyContent: 'center', minHeight: 440, gap: 3,
+          '@keyframes idleFade': { from: { opacity: 0 }, to: { opacity: 1 } },
+          animation: 'idleFade 0.4s ease both',
         }}>
-          <PlayArrowIcon sx={{ fontSize: 52, color: 'text.disabled' }} />
-          <Typography sx={{
-            fontFamily: '"Raleway", sans-serif',
-            fontSize: '0.9rem', color: 'text.disabled', textAlign: 'center',
-          }}>
-            Select a configuration and click "Run &amp; Analyse" to begin
-          </Typography>
+          <Box sx={{ opacity: 0.35 }}>
+            <AnimatedRings accent={accent} size={100} />
+          </Box>
+          <Box sx={{ textAlign: 'center', maxWidth: 380 }}>
+            <Typography sx={{
+              fontFamily: '"Cormorant Garamond", serif',
+              fontSize: '1.35rem', fontWeight: 600, color: 'text.secondary', mb: 1,
+            }}>
+              Run & Analyse
+            </Typography>
+            <Typography sx={{
+              fontFamily: '"Raleway", sans-serif',
+              fontSize: '0.82rem', color: 'text.disabled', lineHeight: 1.7,
+            }}>
+              Triggers a PeopleSoft run, downloads the report via FTP,
+              then passes it to the AI model for instant insights.
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+            {['Trigger · poll · download in one step', 'AI-generated executive summary & findings', 'Column profiles, anomalies, and DQ checks'].map((t) => (
+              <Box key={t} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: accent, opacity: 0.45, flexShrink: 0 }} />
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', color: 'text.disabled' }}>
+                  {t}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )}
     </Box>
