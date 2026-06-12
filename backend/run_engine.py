@@ -162,7 +162,10 @@ def run_one_engine(config, engine_process_name, engine_label, s, user, config_id
         if instance_id:
             remote_path = remote_path.replace("{instance_id}", instance_id)
         if file_name:
-            remote_path = remote_path.replace("{file_name}", file_name)
+            if "{file_name}" in remote_path:
+                remote_path = remote_path.replace("{file_name}", file_name)
+            else:
+                remote_path = remote_path.rstrip("/") + "/" + file_name
 
         t3 = _time.time()
         try:
