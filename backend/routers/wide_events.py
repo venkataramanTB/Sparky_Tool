@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from auth import require_admin, get_current_user
@@ -202,16 +201,11 @@ async def stream_events(
             return []
         db = _SessionLocal()
         try:
-            clauses = ["id > :since_id"]
-            params: dict = {"since_id": since_id}
-            if event:  clauses.append("event = :event");   params["event"]  = event
-            if status: clauses.append("status = :status"); params["status"] = status
-            if tier:   clauses.append("tier = :tier");     params["tier"]   = tier
-            where = " AND ".join(clauses)
-            return db.execute(
-                text(f"SELECT * FROM wide_events WHERE {where} ORDER BY id ASC LIMIT 50"),
-                params,
-            ).fetchall()
+            q = db.query(WideEvent).filter(WideEvent.id > since_id)
+            if event:  q = q.filter(WideEvent.event == event)
+            if status: q = q.filter(WideEvent.status == status)
+            if tier:   q = q.filter(WideEvent.tier == tier)
+            return q.order_by(WideEvent.id.asc()).limit(50).all()
         finally:
             db.close()
 

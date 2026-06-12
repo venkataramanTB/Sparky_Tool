@@ -10,6 +10,7 @@ from typing import Optional
 import httpx
 from fastapi import HTTPException
 
+from cryptography.fernet import InvalidToken
 from encrypt import decrypt
 from logger import get_logger
 from sanitize import strip_all_whitespace as _strip_ws
@@ -21,12 +22,23 @@ import scp_client
 log = get_logger("run_engine")
 
 
+def _safe_decrypt(value: str | None, field: str) -> str:
+    """Decrypt a Fernet-encrypted field; return empty string on failure."""
+    if not value:
+        return ""
+    try:
+        return decrypt(value)
+    except (InvalidToken, Exception) as exc:
+        log.error("decrypt failed for field %r: %s", field, exc)
+        return ""
+
+
 def config_to_ns(config: UserConfig) -> SimpleNamespace:
     return SimpleNamespace(
         ps_base_url         = _strip_ws(config.ps_base_url),
         ps_auth_type        = config.ps_auth_type or "basic",
         ps_username         = config.ps_username or "",
-        ps_password         = decrypt(config.ps_password_enc),
+        ps_password         = _safe_decrypt(config.ps_password_enc, "ps_password_enc"),
         ps_endpoint         = _strip_ws(config.ps_endpoint),
         ps_status_endpoint  = _strip_ws(config.ps_status_endpoint),
         ps_process_name     = _strip_ws(config.ps_process_name),
@@ -34,19 +46,19 @@ def config_to_ns(config: UserConfig) -> SimpleNamespace:
         sftp_host           = config.sftp_host or "",
         sftp_port           = config.sftp_port or 22,
         sftp_username       = config.sftp_username or "",
-        sftp_password       = decrypt(config.sftp_password_enc),
+        sftp_password       = _safe_decrypt(config.sftp_password_enc, "sftp_password_enc"),
         sftp_remote_path    = config.sftp_remote_path or "",
         ftp_host            = config.ftp_host or "",
         ftp_port            = config.ftp_port or 21,
         ftp_username        = _strip_ws(config.ftp_username or ""),
-        ftp_password        = _strip_ws(decrypt(config.ftp_password_enc) if config.ftp_password_enc else ""),
+        ftp_password        = _strip_ws(_safe_decrypt(config.ftp_password_enc, "ftp_password_enc")),
         ftp_remote_path     = config.ftp_remote_path or "",
         ftp_connection_type = config.ftp_connection_type or "ftp",
         ftp_passive         = config.ftp_passive if config.ftp_passive is not None else True,
         win_host            = config.win_host or "",
         win_port            = config.win_port or 5985,
         win_username        = config.win_username or "",
-        win_password        = decrypt(config.win_password_enc) if config.win_password_enc else "",
+        win_password        = _safe_decrypt(config.win_password_enc, "win_password_enc"),
         win_use_ssl         = config.win_use_ssl or False,
         win_auth_type       = config.win_auth_type or "ntlm",
         win_connection_type = config.win_connection_type or "winrm",

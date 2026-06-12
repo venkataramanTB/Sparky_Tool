@@ -625,7 +625,7 @@ def test_retrieval(body: RetrievalTestPayload):
              body.sftp_username, body.sftp_host, body.sftp_port, body.retrieval_method, body.sftp_remote_path)
 
     client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.set_missing_host_key_policy(paramiko.WarningPolicy())
     try:
         client.connect(hostname=body.sftp_host, port=body.sftp_port,
                        username=body.sftp_username, password=password, timeout=10, banner_timeout=10)

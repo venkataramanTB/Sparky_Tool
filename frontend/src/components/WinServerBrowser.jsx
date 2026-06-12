@@ -199,6 +199,7 @@ export default function WinServerBrowser({
                 size="small"
                 onClick={goBack}
                 disabled={history.length === 0}
+                aria-label="Go back"
                 sx={{ color: history.length ? accent : 'text.disabled', p: 0.5 }}
               >
                 <ArrowBackIcon sx={{ fontSize: 18 }} />
@@ -206,12 +207,12 @@ export default function WinServerBrowser({
             </span>
           </Tooltip>
           <Tooltip title="Root path" arrow>
-            <IconButton size="small" onClick={goHome} sx={{ color: 'text.secondary', p: 0.5, '&:hover': { color: accent } }}>
+            <IconButton size="small" onClick={goHome} aria-label="Go to root path" sx={{ color: 'text.secondary', p: 0.5, '&:hover': { color: accent } }}>
               <HomeIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Tooltip>
           <Tooltip title="Refresh" arrow>
-            <IconButton size="small" onClick={() => browse(currentPath)} disabled={loading} sx={{ color: 'text.secondary', p: 0.5, '&:hover': { color: accent } }}>
+            <IconButton size="small" onClick={() => browse(currentPath)} disabled={loading} aria-label="Refresh directory" sx={{ color: 'text.secondary', p: 0.5, '&:hover': { color: accent } }}>
               <RefreshIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Tooltip>
@@ -261,7 +262,7 @@ export default function WinServerBrowser({
           </Box>
 
           {/* Close */}
-          <IconButton size="small" onClick={onClose} sx={{ color: 'text.secondary', p: 0.5, '&:hover': { color: 'text.primary' } }}>
+          <IconButton size="small" onClick={onClose} aria-label="Close browser" sx={{ color: 'text.secondary', p: 0.5, '&:hover': { color: 'text.primary' } }}>
             <CloseIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
@@ -405,7 +406,7 @@ export default function WinServerBrowser({
                 <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.54rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: accent, flexShrink: 0 }}>
                   .{fileExt(viewFile.name)}
                 </Typography>
-                <IconButton size="small" onClick={() => { setViewFile(null); setFileContent(null) }} sx={{ color: 'text.disabled', p: 0.3, '&:hover': { color: 'text.primary' } }}>
+                <IconButton size="small" onClick={() => { setViewFile(null); setFileContent(null) }} aria-label="Close file viewer" sx={{ color: 'text.disabled', p: 0.3, '&:hover': { color: 'text.primary' } }}>
                   <CloseIcon sx={{ fontSize: 14 }} />
                 </IconButton>
               </Box>
