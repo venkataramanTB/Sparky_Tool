@@ -302,10 +302,39 @@ def ping():
 
 @app.post("/api/run")
 def run():
-    log.info("v1 run triggered")
+    from database import _SessionLocal
+    from models import Engine as _Engine
+    from types import SimpleNamespace as _NS
+
+    # Resolve process name from DB (first active engine by sort order)
+    process_name = settings.ps_process_name
+    if _SessionLocal is not None:
+        db = _SessionLocal()
+        try:
+            first_engine = (
+                db.query(_Engine)
+                .filter(_Engine.is_active == True)
+                .order_by(_Engine.sort_order, _Engine.id)
+                .first()
+            )
+            if first_engine:
+                process_name = first_engine.process_name
+        finally:
+            db.close()
+
+    if not process_name:
+        raise HTTPException(
+            status_code=400,
+            detail="No active engine configured. Add an engine via the Engines page.",
+        )
+
+    run_settings = _NS(**{k: getattr(settings, k) for k in vars(settings) if not k.startswith("_")})
+    run_settings.ps_process_name = process_name
+
+    log.info("v1 run triggered  process=%s", process_name)
     start = _time.time()
     try:
-        trigger_result = trigger_engine()
+        trigger_result = trigger_engine(_settings=run_settings)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=502, detail=f"PeopleSoft error: {exc}")
     except httpx.TimeoutException:
@@ -369,7 +398,7 @@ class SettingsPayload(BaseModel):
     ps_password: str = ""
     ps_endpoint: str = ""
     ps_status_endpoint: str = ""
-    ps_process_name: str = "SM_DISCOVERY"
+    ps_process_name: str = ""
     retrieval_method: str = "sftp"
     sftp_host: str = ""
     sftp_port: str = "22"

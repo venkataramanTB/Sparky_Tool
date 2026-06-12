@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     ps_password: str = ""
     ps_endpoint: str = ""
     ps_status_endpoint: str = ""
-    ps_process_name: str = "APPR_CLD_AE"
+    ps_process_name: str = ""
 
     retrieval_method: str = "sftp"
 
