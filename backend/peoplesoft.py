@@ -147,7 +147,7 @@ def poll_status(instance_id: str, _settings=None, max_wait: int = 600, poll_inte
                 if body:
                     log.error("Poll HTTP %s — PS error: %s", response.status_code, body)
                     raise httpx.HTTPStatusError(
-                        f"PeopleSoft returned HTTP {response.status_code} — {body}",
+                        f"PeopleSoft returned HTTP {response.status_code} — {body} (url: {url})",
                         request=response.request, response=response,
                     )
                 log.warning(
@@ -160,7 +160,8 @@ def poll_status(instance_id: str, _settings=None, max_wait: int = 600, poll_inte
                 body = _ps_error_body(response) or response.text.strip()
                 raise httpx.HTTPStatusError(
                     f"PeopleSoft returned HTTP {response.status_code}"
-                    + (f" — {body}" if body else ""),
+                    + (f" — {body}" if body else "")
+                    + f" (url: {url})",
                     request=response.request, response=response,
                 )
 
