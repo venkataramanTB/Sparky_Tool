@@ -290,8 +290,13 @@ export const deletePromptReference = (refId, token) =>
   client.delete(`/v2/insights/references/${refId}`, { headers: auth(token) })
 
 // Run Outputs (v2)
-export const listRunOutputs    = (token, params = {})  => client.get('/v2/run-outputs/',               { headers: auth(token), params })
-export const deleteRunOutput   = (id, token)            => client.delete(`/v2/run-outputs/${id}`,       { headers: auth(token) })
+export const listRunOutputs        = (token, params = {})  => client.get('/v2/run-outputs/',                        { headers: auth(token), params })
+export const deleteRunOutput       = (id, token)            => client.delete(`/v2/run-outputs/${id}`,                { headers: auth(token) })
+export const reconstructRunOutput  = (id, token)            => client.get(`/v2/run-outputs/${id}/reconstruct`,       { headers: auth(token) })
+
+// Analysis Results (v2)
+export const listAnalysisResults = (token, params = {}) => client.get('/v2/analysis-results/',        { headers: auth(token), params })
+export const getAnalysisResult   = (id, token)          => client.get(`/v2/analysis-results/${id}`,   { headers: auth(token) })
 export async function analyzeRunOutput(id, aiModelId, token) {
   const qs   = aiModelId != null ? `?ai_model_id=${encodeURIComponent(aiModelId)}` : ''
   const base = _origin ? `${_origin}/api` : '/api'

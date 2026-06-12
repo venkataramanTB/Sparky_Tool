@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from auth import get_current_user
 from database import get_db
-from models import RunOutput, User
+from models import RunOutput, RunLog, DataQualityResult, User
 from logger import get_logger
 
 log = get_logger("run_outputs")
@@ -274,7 +274,7 @@ async def analyze_run_output(
 
         async def worker():
             try:
-                result = await asyncio.to_thread(_run_analysis, raw, fname, user, db, ai_model_id)
+                result = await asyncio.to_thread(_run_analysis, raw, fname, user, db, ai_model_id, output_id)
                 result["meta"]["run_output_id"] = output_id
                 box["result"] = result
             except Exception as exc:
@@ -306,3 +306,78 @@ async def analyze_run_output(
         media_type="text/event-stream",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )
+
+
+_MAX_HISTORY_ROWS = 10_000
+
+
+@router.get("/{output_id}/reconstruct")
+def reconstruct_run_output(
+    output_id: int,
+    user:      User    = Depends(get_current_user),
+    db:        Session = Depends(get_db),
+):
+    """Reconstruct a runResult-shaped payload from stored data for the history dashboard."""
+    import pandas as pd
+
+    row = db.query(RunOutput).filter(
+        RunOutput.id == output_id, RunOutput.user_id == user.id
+    ).first()
+    if not row:
+        raise HTTPException(404, "Run output not found")
+
+    try:
+        df = pd.read_csv(io.BytesIO(row.csv_content), low_memory=False, dtype=str).fillna("")
+    except Exception as exc:
+        raise HTTPException(422, f"Could not parse stored CSV: {exc}") from exc
+
+    columns = list(df.columns)
+    total_rows = len(df)
+    rows = df.head(_MAX_HISTORY_ROWS).to_dict("records")
+
+    run_log = None
+    if row.run_log_id:
+        run_log = db.query(RunLog).filter(RunLog.id == row.run_log_id).first()
+
+    dq_results = []
+    if run_log:
+        dq_rows = db.query(DataQualityResult).filter(
+            DataQualityResult.run_log_id == run_log.id
+        ).all()
+        dq_results = [
+            {
+                "rule_name":    r.rule_name,
+                "rule_type":    r.rule_type,
+                "passed":       r.passed,
+                "actual_value": r.actual_value,
+                "message":      r.message,
+            }
+            for r in dq_rows
+        ]
+
+    run_entry = {
+        "id":           run_log.id           if run_log else None,
+        "duration_ms":  run_log.duration_ms  if run_log else None,
+        "engine_name":  row.engine_name,
+        "process_name": row.process_name,
+        "status":       run_log.status       if run_log else "success",
+    }
+
+    log.info("reconstruct_run_output  id=%d  user=%s  rows=%d", output_id, user.id[:8], total_rows)
+
+    return {
+        "instance_id":    run_log.instance_id if run_log else "",
+        "report_id":      run_log.report_id   if run_log else "",
+        "row_count":      row.row_count,
+        "runs":           [run_entry],
+        "success_count":  1,
+        "dq_results":     dq_results,
+        "rows":           rows,
+        "columns":        columns,
+        "run_output_id":  output_id,
+        "config_name":    row.config_name,
+        "display_name":   row.display_name,
+        "created_at":     row.created_at.isoformat() if row.created_at else None,
+        "total_rows":     total_rows,
+        "rows_truncated": total_rows > _MAX_HISTORY_ROWS,
+    }

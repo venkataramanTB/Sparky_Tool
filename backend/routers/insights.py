@@ -618,6 +618,7 @@ def _finalize_chart_spec(
     completion_tokens: int = 0,
     reasoning_tokens: int = 0,
     cached_tokens: int = 0,
+    run_output_id: "int | None" = None,
 ) -> dict:
     """Parse AI JSON, demask PII, persist to DB, attach meta. Returns final chart_spec."""
     try:
@@ -691,6 +692,7 @@ def _finalize_chart_spec(
         ar = AnalysisResult(
             user_id=user.id,
             conversation_id=conversation_id,
+            run_output_id=run_output_id,
             filename=ctx["fname"],
             provider=ctx["provider"],
             model_id_str=ctx["model_id"],
@@ -712,7 +714,7 @@ def _finalize_chart_spec(
     return chart_spec
 
 
-def _run_analysis(raw: bytes, fname: str, user: "User", db: "Session", ai_model_id: "int | None") -> dict:
+def _run_analysis(raw: bytes, fname: str, user: "User", db: "Session", ai_model_id: "int | None", run_output_id: "int | None" = None) -> dict:
     """Non-streaming pipeline — shared by the SSE file-upload and run-output endpoints."""
     ctx      = _prepare_for_ai(raw, fname, user, db, ai_model_id)
     provider = ctx["provider"]
@@ -782,7 +784,7 @@ def _run_analysis(raw: bytes, fname: str, user: "User", db: "Session", ai_model_
         log.error("AI call failed provider=%s class=%s: %s", provider, type(exc).__name__, exc)
         raise HTTPException(502, msg) from exc
 
-    return _finalize_chart_spec(raw_text, ctx, user, db, prompt_tokens, completion_tokens, reasoning_tokens, cached_tokens)
+    return _finalize_chart_spec(raw_text, ctx, user, db, prompt_tokens, completion_tokens, reasoning_tokens, cached_tokens, run_output_id)
 
 
 @router.post("/analyze-file")

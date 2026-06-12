@@ -221,6 +221,7 @@ try:
     from routers import wide_events as _we, preferences as _pref, feature_flags as _ff
     from routers import conversations as _conv, engines as _eng, run_outputs as _ro
     from routers import schedules as _sched_r, notifications as _notif_r, data_quality as _dq_r
+    from routers import analysis_results as _ar
     from database import get_db
     from models import UserConfig
     from auth import get_current_user
@@ -240,6 +241,7 @@ try:
     app.include_router(_sched_r.router)
     app.include_router(_notif_r.router)
     app.include_router(_dq_r.router)
+    app.include_router(_ar.router)
     _v2_enabled = True
 
     from sqlalchemy.orm import Session
