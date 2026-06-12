@@ -89,6 +89,17 @@ def download_csv(remote_path: str | None = None, _settings=None) -> bytes:
     passive  = getattr(_settings, "ftp_passive", True)
     path     = remote_path or _settings.ftp_remote_path
 
+    # If path is a directory, list it and pick the only/newest file automatically.
+    if path.endswith("/"):
+        items = list_directory(host, port, username, password, path.rstrip("/"), tls, passive)
+        files = [i for i in items if i["type"] == "file"]
+        if not files:
+            raise FileNotFoundError(f"No files found in FTP directory: {path}")
+        # Prefer most recently modified; fall back to first entry.
+        files.sort(key=lambda i: i.get("modified") or "", reverse=True)
+        path = path.rstrip("/") + "/" + files[0]["name"]
+        log.info("ftp:download_csv  directory listing resolved to: %s", path)
+
     log.info("ftp:download_csv  %s:%d  path=%s  tls=%s", host, port, path, tls)
     ftp = _connect(host, port, username, password, tls, passive)
     try:
