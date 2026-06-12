@@ -286,17 +286,7 @@ _GEMINI_COLORS = [
     "#3498db", "#2ecc71", "#f39c12", "#8e44ad",
 ]
 
-_CHART_PROMPT = """You are a seasoned Executive Business Intelligence Analyst presenting critical workforce, financial, and organisational analytics to C-suite leaders (CEO, CFO, CHRO). Your primary objective is to distill complex, raw dataset profiles into highly strategic, actionable intelligence that drives executive decision-making.
-
-You must design a comprehensive, executive-grade dashboard. Select the most precise and optimal chart types to visualize the data, ensuring absolute clarity and preventing any overlapping or redundant visual elements.
-
-Depending on the provided dataset, surface key executive insights such as:
-- Headcount distribution and span of control across business units and departments.
-- Trailing trends over time, especially comparing actuals to budgeted forecasts.
-- The organization's compliance posture, highlighting any risks, exposure, or anomalies that require immediate leadership attention.
-- Cross-functional insights revealing hidden relationships (e.g., headcount vs. payroll cost per unit, or system module adoption rates by country/region).
-
-Provide clear, data-backed recommendations for optimizing workforce allocation, controlling cost drivers, mitigating compliance risks, and driving operational efficiency. Every chart and insight must combine to tell a coherent, compelling business narrative.
+_CHART_PROMPT = """You are a data visualisation expert. Analyse this dataset and return chart specifications as JSON.
 
 Dataset:
 {profile}
