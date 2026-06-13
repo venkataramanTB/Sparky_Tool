@@ -306,7 +306,10 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
               <DarkModeIcon sx={{ fontSize: 16, color: mode === 'dark' ? accent : 'text.disabled' }} />
               <Switch
                 checked={mode === 'light'}
-                onChange={toggleMode}
+                onChange={(e) => {
+                  const rect = e.target.getBoundingClientRect()
+                  toggleMode({ clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 })
+                }}
                 size="small"
                 sx={{
                   '& .MuiSwitch-switchBase.Mui-checked': { color: accent },
@@ -325,7 +328,7 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
               {ACCENT_OPTIONS.map((opt) => (
                 <Tooltip key={opt.value} title={opt.label} placement="top" arrow>
                   <Box
-                    onClick={() => setAccentColor(opt.value)}
+                    onClick={(e) => setAccentColor(opt.value, e)}
                     sx={{
                       width: 26, height: 26, borderRadius: '50%',
                       bgcolor: opt.value, cursor: 'pointer',

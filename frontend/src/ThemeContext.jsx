@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import sparkyPng from './assets/sparky-dog.png'
@@ -268,21 +269,41 @@ export function ThemeContextProvider({ children }) {
   // Update the browser-tab favicon whenever the effective accent changes.
   useEffect(() => { updateFavicon(accent) }, [accent])
 
-  const toggleMode = () => {
+  const setVtOrigin = (event) => {
+    const x = event?.clientX ?? window.innerWidth / 2
+    const y = event?.clientY ?? window.innerHeight / 2
+    document.documentElement.style.setProperty('--vt-origin-x', `${x}px`)
+    document.documentElement.style.setProperty('--vt-origin-y', `${y}px`)
+  }
+
+  const toggleMode = (event) => {
     const next = mode === 'dark' ? 'light' : 'dark'
-    setMode(next)
-    localStorage.setItem(LS_MODE, next)
+    if (!document.startViewTransition) {
+      setMode(next)
+      localStorage.setItem(LS_MODE, next)
+      return
+    }
+    setVtOrigin(event)
+    document.startViewTransition(() => {
+      flushSync(() => setMode(next))
+      localStorage.setItem(LS_MODE, next)
+    })
   }
 
   // Changes the accent only for the currently active mode.
-  const setAccentColor = (color) => {
-    if (mode === 'dark') {
-      setAccentDarkS(color)
-      localStorage.setItem(LS_ACCENT_DARK, color)
-    } else {
-      setAccentLightS(color)
-      localStorage.setItem(LS_ACCENT_LIGHT, color)
+  const setAccentColor = (color, event) => {
+    const apply = () => {
+      if (mode === 'dark') {
+        setAccentDarkS(color)
+        localStorage.setItem(LS_ACCENT_DARK, color)
+      } else {
+        setAccentLightS(color)
+        localStorage.setItem(LS_ACCENT_LIGHT, color)
+      }
     }
+    if (!document.startViewTransition) { apply(); return }
+    setVtOrigin(event)
+    document.startViewTransition(() => { flushSync(apply) })
   }
 
   return (

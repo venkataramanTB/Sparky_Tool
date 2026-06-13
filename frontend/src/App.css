@@ -13,3 +13,28 @@ html, body {
 
 /* Scrollbar sizing — colours injected dynamically by ThemeContext */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
+
+/* ── View Transition: circular reveal from click origin ──────────────────── */
+@keyframes sparky-reveal {
+  from { clip-path: circle(0px at var(--vt-origin-x, 50vw) var(--vt-origin-y, 50vh)); }
+  to   { clip-path: circle(200vmax at var(--vt-origin-x, 50vw) var(--vt-origin-y, 50vh)); }
+}
+
+@keyframes sparky-fade-out {
+  to { opacity: 0; }
+}
+
+::view-transition-old(root) {
+  animation: sparky-fade-out 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  animation: sparky-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) { animation: none; }
+}
