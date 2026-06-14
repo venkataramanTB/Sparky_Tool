@@ -19,7 +19,7 @@ import sftp_client
 import scp_client
 from csv_parser import parse_and_compute
 from settings_manager import update_env
-from sanitize import strip_all_whitespace as _strip_ws
+from sanitize import strip_all_whitespace as _strip_ws, validate_no_path_traversal as _validate_path
 
 # Initialise logging before anything that might emit a log record
 setup_logging()
@@ -106,6 +106,19 @@ app.add_middleware(
 )
 
 
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com data:; "
+    "img-src 'self' data: blob: https:; "
+    "connect-src 'self' wss: https://*.clerk.com https://*.clerk.accounts.dev https://api.anthropic.com https://openrouter.ai https://generativelanguage.googleapis.com; "
+    "frame-ancestors 'none'; "
+    "object-src 'none'; "
+    "base-uri 'self';"
+)
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -113,6 +126,8 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("X-XSS-Protection", "1; mode=block")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Content-Security-Policy", _CSP)
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     return response
 
 
@@ -976,6 +991,10 @@ def ftp_browse(
     user = Depends(get_current_user),
 ):
     import ftp_client as _ftp
+    try:
+        _validate_path(body.path)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     username, password = _resolve_ftp_creds(body, user, db)
     tls = body.ftp_connection_type == "ftps"
     log.info("ftp_browse  %s  path=%s  tls=%s", body.ftp_host, body.path, tls)
@@ -998,6 +1017,10 @@ def ftp_read_file(
     user = Depends(get_current_user),
 ):
     import ftp_client as _ftp
+    try:
+        _validate_path(body.path)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     username, password = _resolve_ftp_creds(body, user, db)
     tls = body.ftp_connection_type == "ftps"
     log.info("ftp_read_file  %s  path=%s  tls=%s", body.ftp_host, body.path, tls)

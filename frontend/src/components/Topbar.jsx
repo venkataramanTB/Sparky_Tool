@@ -48,9 +48,16 @@ function NavPill({ icon: Icon, label, active, onClick, accent }) {
 
   return (
     <Box
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      aria-current={active ? 'page' : undefined}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       sx={{
         display: 'flex', alignItems: 'center',
         height: 52, px: 1.25,
@@ -58,6 +65,8 @@ function NavPill({ icon: Icon, label, active, onClick, accent }) {
         borderBottom: `2px solid ${active ? accent : 'transparent'}`,
         bgcolor: hovered ? `${accent}0e` : 'transparent',
         transition: 'background 0.15s ease, border-color 0.15s ease',
+        outline: 'none',
+        '&:focus-visible': { outline: `2px solid ${accent}`, outlineOffset: '-2px' },
       }}
     >
       <Icon sx={{
@@ -122,7 +131,11 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 1.5, flexShrink: 0 }}>
           <Tooltip title="Did you know? — The story of Sparky" placement="bottom" arrow>
             <Box
+              role="button"
+              tabIndex={0}
+              aria-label="The story of Sparky"
               onClick={() => setDogHistoryOpen(true)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDogHistoryOpen(true) } }}
               sx={{
                 cursor: 'pointer',
                 borderRadius: '50%',
@@ -131,14 +144,19 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
                   transform: 'scale(1.12)',
                   boxShadow: `0 0 12px ${accent}66`,
                 },
+                '&:focus-visible': { outline: `2px solid ${accent}`, outlineOffset: 2 },
               }}
             >
               <SparkyDog size={34} circular />
             </Box>
           </Tooltip>
           <Box
+            role="button"
+            tabIndex={0}
+            aria-label="Go to dashboard"
             onClick={() => navigate('dashboard')}
-            sx={{ display: { xs: 'none', sm: 'block' }, cursor: 'pointer' }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('dashboard') } }}
+            sx={{ display: { xs: 'none', sm: 'block' }, cursor: 'pointer', outline: 'none', '&:focus-visible': { outline: `2px solid ${accent}`, outlineOffset: 2, borderRadius: 1 } }}
           >
             <Typography component="div" sx={{ fontFamily: '"Cormorant Garamond", serif', fontWeight: 700, fontSize: '1rem', letterSpacing: '0.2em', color: accent, textTransform: 'uppercase', lineHeight: 1, userSelect: 'none' }}>
               <SparkyWordmark text="Sparky Tool" accent={accent} />
@@ -167,9 +185,17 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
 
         {/* ── Account / Persona picker ─────────────── */}
         <Box
+          role="button"
+          tabIndex={0}
+          aria-label={`Account menu for ${displayName}`}
+          aria-haspopup="menu"
+          aria-expanded={Boolean(accountAnchor)}
           onClick={(e) => setAccountAnchor(e.currentTarget)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAccountAnchor(e.currentTarget) } }}
           onMouseEnter={() => setAccountHovered(true)}
           onMouseLeave={() => setAccountHovered(false)}
+          onFocus={() => setAccountHovered(true)}
+          onBlur={() => setAccountHovered(false)}
           sx={{
             display: 'flex', alignItems: 'center', cursor: 'pointer',
             px: 1.25, height: 34, borderRadius: 1,
@@ -178,6 +204,8 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
             bgcolor: accountHovered ? `${accent}12` : 'transparent',
             transition: 'border-color 0.15s ease, background 0.15s ease',
             flexShrink: 0,
+            outline: 'none',
+            '&:focus-visible': { outline: `2px solid ${accent}`, outlineOffset: 2 },
           }}
         >
           <ManageAccountsIcon sx={{ fontSize: 16, color: accent, flexShrink: 0 }} />
