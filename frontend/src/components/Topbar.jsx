@@ -24,6 +24,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import InfoOutlinedIcon       from '@mui/icons-material/InfoOutlined'
 import TuneOutlinedIcon       from '@mui/icons-material/TuneOutlined'
 import { useThemeContext, ACCENT_OPTIONS } from '../ThemeContext'
+import { companyLogoUrl, getCompanyInfo } from '../api'
 import SparkyDog from '../assets/SparkyDog'
 import SparkyWordmark from './SparkyWordmark'
 
@@ -92,8 +93,17 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
   const profileImageUrl = clerkUser?.imageUrl
 
   const emailDomain = user?.email?.split('@')[1] ?? null
-  const [logoError, setLogoError] = useState(false)
-  useEffect(() => { setLogoError(false) }, [emailDomain])
+  const [logoError,    setLogoError]    = useState(false)
+  const [companyInfo,  setCompanyInfo]  = useState(null)
+
+  useEffect(() => {
+    setLogoError(false)
+    setCompanyInfo(null)
+    if (!emailDomain) return
+    getCompanyInfo(emailDomain)
+      .then((r) => setCompanyInfo(r.data))
+      .catch(() => {})
+  }, [emailDomain])
 
   const [accountAnchor,    setAccountAnchor]    = useState(null)
   const [themeAnchor,      setThemeAnchor]      = useState(null)
@@ -190,7 +200,7 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
           {emailDomain && !logoError ? (
             <Box
               component="img"
-              src={`https://logo.clearbit.com/${emailDomain}`}
+              src={companyLogoUrl(emailDomain)}
               alt={emailDomain}
               onError={() => setLogoError(true)}
               sx={{ width: 16, height: 16, borderRadius: '3px', objectFit: 'contain', flexShrink: 0 }}
@@ -237,7 +247,7 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
                     {!logoError && (
                       <Box
                         component="img"
-                        src={`https://logo.clearbit.com/${emailDomain}`}
+                        src={companyLogoUrl(emailDomain)}
                         alt={emailDomain}
                         onError={() => setLogoError(true)}
                         sx={{ width: 14, height: 14, borderRadius: '2px', objectFit: 'contain', flexShrink: 0 }}
@@ -266,6 +276,47 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
                 />
               )}
             </Box>
+
+            {/* Company info card */}
+            {companyInfo && (
+              <Box sx={{
+                mt: 1.5, p: 1.25,
+                border: '1px solid', borderColor: 'divider',
+                borderRadius: 1, bgcolor: `${accent}06`,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: companyInfo.description ? 0.75 : 0 }}>
+                  {emailDomain && !logoError && (
+                    <Box
+                      component="img"
+                      src={companyLogoUrl(emailDomain)}
+                      alt={emailDomain}
+                      onError={() => setLogoError(true)}
+                      sx={{ width: 18, height: 18, borderRadius: '3px', objectFit: 'contain', flexShrink: 0 }}
+                    />
+                  )}
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.7rem', color: 'text.primary', lineHeight: 1.2 }}>
+                      {companyInfo.name ?? emailDomain}
+                    </Typography>
+                    {(companyInfo.industry || companyInfo.headquarters) && (
+                      <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.58rem', color: 'text.secondary', mt: 0.15 }}>
+                        {[companyInfo.industry, companyInfo.headquarters].filter(Boolean).join(' · ')}
+                      </Typography>
+                    )}
+                  </Box>
+                  {companyInfo.founded && (
+                    <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.6rem', color: accent, ml: 'auto', flexShrink: 0 }}>
+                      est. {companyInfo.founded}
+                    </Typography>
+                  )}
+                </Box>
+                {companyInfo.description && (
+                  <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.62rem', color: 'text.secondary', lineHeight: 1.6, fontStyle: 'italic' }}>
+                    {companyInfo.description}
+                  </Typography>
+                )}
+              </Box>
+            )}
           </Box>
           <Divider sx={{ borderColor: 'divider' }} />
           <MenuItem onClick={() => { navigate('settings'); closeAll() }} sx={{ gap: 1.5, py: 1.2, mx: 0.5, borderRadius: 1 }}>

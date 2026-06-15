@@ -433,3 +433,8 @@ export const listDqResults  = (token, params = {})       => client.get('/v2/data
 // Run Diff (v2)
 export const diffRunOutputs = (aId, bId, keyColumn, token) =>
   client.get('/v2/run-outputs/diff', { headers: auth(token), params: { a: aId, b: bId, ...(keyColumn ? { key_column: keyColumn } : {}) } })
+
+// Company (v2)
+export const companyLogoUrl = (domain) =>
+  `${_origin ? `${_origin}/api` : '/api'}/v2/company/logo?domain=${encodeURIComponent(domain)}`
+export const getCompanyInfo = (domain) => client.get(`/v2/company/info?domain=${encodeURIComponent(domain)}`)
