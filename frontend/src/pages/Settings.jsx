@@ -132,6 +132,7 @@ export default function Settings() {
   const [psTestStatus, setPsTestStatus]     = useState(null)
   const [psBodyOpen, setPsBodyOpen]         = useState(false)
   const [curlCopied, setCurlCopied]         = useState(false)
+  const [psCopied, setPsCopied]             = useState(false)
   const [showWinPass, setShowWinPass]       = useState(false)
   const [winTestStatus, setWinTestStatus]   = useState(null)
   const [winBrowserOpen, setWinBrowserOpen] = useState(false)
@@ -264,7 +265,7 @@ export default function Settings() {
   // An empty string causes the backend to fall back to any .env-based v1 credentials.
   const livePass = (v) => (v === '***' ? '' : v)
 
-  const _buildPsCurl = (url, authType, username, password, processName) => {
+  const _buildCurlCmd = (url, authType, username, password, processName) => {
     const body = JSON.stringify(processName ? { processname: processName } : {})
     const authPart = authType === 'bearer'
       ? `-H "Authorization: Bearer ${password || '<token>'}"`
@@ -272,9 +273,31 @@ export default function Settings() {
     return `curl -X POST "${url}" \\\n  -H "Content-Type: application/json" \\\n  ${authPart} \\\n  -d '${body}'`
   }
 
+  const _buildPsCmd = (url, authType, username, password, processName) => {
+    const body = JSON.stringify(processName ? { processname: processName } : {})
+    const u = username || '<username>'
+    const p = password || (authType === 'bearer' ? '<token>' : '<password>')
+    if (authType === 'bearer') {
+      return [
+        `$uri     = "${url}"`,
+        `$body    = '${body}'`,
+        `$headers = @{ "Content-Type" = "application/json"; "Authorization" = "Bearer ${p}" }`,
+        `Invoke-RestMethod -Method POST -Uri $uri -Headers $headers -Body $body`,
+      ].join('\n')
+    }
+    return [
+      `$uri     = "${url}"`,
+      `$body    = '${body}'`,
+      `$b64     = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes('${u}:${p}'))`,
+      `$headers = @{ "Content-Type" = "application/json"; "Authorization" = "Basic $b64" }`,
+      `Invoke-RestMethod -Method POST -Uri $uri -Headers $headers -Body $body`,
+    ].join('\n')
+  }
+
   const handlePsTest = async () => {
     setPsTestStatus('testing')
     setCurlCopied(false)
+    setPsCopied(false)
     const firstEngine = engines.find((e) => e.id === form.engine_ids[0])
     const processName = firstEngine?.process_name || form.ps_process_name
     const base = form.ps_base_url.replace(/\/$/, '')
@@ -287,11 +310,14 @@ export default function Settings() {
         ps_endpoint: form.ps_endpoint, ps_status_endpoint: form.ps_status_endpoint,
         ps_process_name: processName,
       })
-      const curlCmd = _buildPsCurl(res.data.url || (base + ep), form.ps_auth_type, form.ps_username, form.ps_password, processName)
-      setPsTestStatus({ ok: true, http_status: res.data.http_status, url: res.data.url ?? '', body: res.data.body ?? '', instance_id: res.data.instance_id ?? '', status_http_status: res.data.status_http_status, status_url: res.data.status_url ?? '', status_body: res.data.status_body ?? '', curlCmd })
+      const effectiveUrl = res.data.url || (base + ep)
+      const curlCmd = _buildCurlCmd(effectiveUrl, form.ps_auth_type, form.ps_username, form.ps_password, processName)
+      const psCmd   = _buildPsCmd(effectiveUrl, form.ps_auth_type, form.ps_username, form.ps_password, processName)
+      setPsTestStatus({ ok: true, http_status: res.data.http_status, url: res.data.url ?? '', body: res.data.body ?? '', instance_id: res.data.instance_id ?? '', status_http_status: res.data.status_http_status, status_url: res.data.status_url ?? '', status_body: res.data.status_body ?? '', curlCmd, psCmd })
     } catch (err) {
-      const curlCmd = _buildPsCurl(base + ep, form.ps_auth_type, form.ps_username, form.ps_password, processName)
-      setPsTestStatus({ ok: false, message: parseError(err, 'API test failed'), url: base + ep, curlCmd })
+      const curlCmd = _buildCurlCmd(base + ep, form.ps_auth_type, form.ps_username, form.ps_password, processName)
+      const psCmd   = _buildPsCmd(base + ep, form.ps_auth_type, form.ps_username, form.ps_password, processName)
+      setPsTestStatus({ ok: false, message: parseError(err, 'API test failed'), url: base + ep, curlCmd, psCmd })
     }
   }
 
@@ -671,13 +697,24 @@ export default function Settings() {
                         View response
                       </Button>
                       {psTestStatus.curlCmd && (
-                        <Tooltip title={curlCopied ? 'Copied!' : 'Copy as cURL'} placement="top">
+                        <Tooltip title={curlCopied ? 'Copied!' : 'Copy as bash cURL'} placement="top">
                           <Button
                             onClick={() => { navigator.clipboard.writeText(psTestStatus.curlCmd); setCurlCopied(true); setTimeout(() => setCurlCopied(false), 2000) }}
                             variant="outlined" size="small"
                             startIcon={curlCopied ? <CheckIcon sx={{ fontSize: 11 }} /> : <ContentCopyIcon sx={{ fontSize: 11 }} />}
                             sx={{ color: accent, borderColor: `${accent}4d`, borderRadius: '3px', fontFamily: '"Raleway"', fontWeight: 700, fontSize: '0.58rem', letterSpacing: '0.14em', px: 1.5, py: 0.5, flexShrink: 0, '&:hover': { borderColor: accent, bgcolor: `${accent}0a` } }}>
                             {curlCopied ? 'Copied!' : 'cURL'}
+                          </Button>
+                        </Tooltip>
+                      )}
+                      {psTestStatus.psCmd && (
+                        <Tooltip title={psCopied ? 'Copied!' : 'Copy as PowerShell (Invoke-RestMethod)'} placement="top">
+                          <Button
+                            onClick={() => { navigator.clipboard.writeText(psTestStatus.psCmd); setPsCopied(true); setTimeout(() => setPsCopied(false), 2000) }}
+                            variant="outlined" size="small"
+                            startIcon={psCopied ? <CheckIcon sx={{ fontSize: 11 }} /> : <ContentCopyIcon sx={{ fontSize: 11 }} />}
+                            sx={{ color: accent, borderColor: `${accent}4d`, borderRadius: '3px', fontFamily: '"Raleway"', fontWeight: 700, fontSize: '0.58rem', letterSpacing: '0.14em', px: 1.5, py: 0.5, flexShrink: 0, '&:hover': { borderColor: accent, bgcolor: `${accent}0a` } }}>
+                            {psCopied ? 'Copied!' : 'PS'}
                           </Button>
                         </Tooltip>
                       )}
@@ -690,16 +727,31 @@ export default function Settings() {
                           POST {psTestStatus.url}
                         </Typography>
                       )}
-                      {psTestStatus.curlCmd && (
-                        <Tooltip title={curlCopied ? 'Copied!' : 'Copy as cURL'} placement="top">
-                          <Button
-                            onClick={() => { navigator.clipboard.writeText(psTestStatus.curlCmd); setCurlCopied(true); setTimeout(() => setCurlCopied(false), 2000) }}
-                            variant="outlined" size="small"
-                            startIcon={curlCopied ? <CheckIcon sx={{ fontSize: 11 }} /> : <ContentCopyIcon sx={{ fontSize: 11 }} />}
-                            sx={{ mt: 1, color: '#c98f8f', borderColor: 'rgba(143,74,74,0.35)', borderRadius: '3px', fontFamily: '"Raleway"', fontWeight: 700, fontSize: '0.58rem', letterSpacing: '0.14em', px: 1.5, py: 0.5, '&:hover': { borderColor: '#c98f8f', bgcolor: 'rgba(143,74,74,0.08)' } }}>
-                            {curlCopied ? 'Copied!' : 'cURL'}
-                          </Button>
-                        </Tooltip>
+                      {(psTestStatus.curlCmd || psTestStatus.psCmd) && (
+                        <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                          {psTestStatus.curlCmd && (
+                            <Tooltip title={curlCopied ? 'Copied!' : 'Copy as bash cURL'} placement="top">
+                              <Button
+                                onClick={() => { navigator.clipboard.writeText(psTestStatus.curlCmd); setCurlCopied(true); setTimeout(() => setCurlCopied(false), 2000) }}
+                                variant="outlined" size="small"
+                                startIcon={curlCopied ? <CheckIcon sx={{ fontSize: 11 }} /> : <ContentCopyIcon sx={{ fontSize: 11 }} />}
+                                sx={{ color: '#c98f8f', borderColor: 'rgba(143,74,74,0.35)', borderRadius: '3px', fontFamily: '"Raleway"', fontWeight: 700, fontSize: '0.58rem', letterSpacing: '0.14em', px: 1.5, py: 0.5, '&:hover': { borderColor: '#c98f8f', bgcolor: 'rgba(143,74,74,0.08)' } }}>
+                                {curlCopied ? 'Copied!' : 'cURL'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                          {psTestStatus.psCmd && (
+                            <Tooltip title={psCopied ? 'Copied!' : 'Copy as PowerShell (Invoke-RestMethod)'} placement="top">
+                              <Button
+                                onClick={() => { navigator.clipboard.writeText(psTestStatus.psCmd); setPsCopied(true); setTimeout(() => setPsCopied(false), 2000) }}
+                                variant="outlined" size="small"
+                                startIcon={psCopied ? <CheckIcon sx={{ fontSize: 11 }} /> : <ContentCopyIcon sx={{ fontSize: 11 }} />}
+                                sx={{ color: '#c98f8f', borderColor: 'rgba(143,74,74,0.35)', borderRadius: '3px', fontFamily: '"Raleway"', fontWeight: 700, fontSize: '0.58rem', letterSpacing: '0.14em', px: 1.5, py: 0.5, '&:hover': { borderColor: '#c98f8f', bgcolor: 'rgba(143,74,74,0.08)' } }}>
+                                {psCopied ? 'Copied!' : 'PS'}
+                              </Button>
+                            </Tooltip>
+                          )}
+                        </Box>
                       )}
                     </Box>
                   )}
