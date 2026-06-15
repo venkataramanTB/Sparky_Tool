@@ -198,21 +198,13 @@ export default function Topbar({ route, navigate, user, onSignOut }) {
           ) : (
             <ManageAccountsIcon sx={{ fontSize: 16, color: accent, flexShrink: 0 }} />
           )}
-          <Box sx={{
-            overflow: 'hidden',
-            maxWidth: accountHovered ? 140 : 0,
-            opacity: accountHovered ? 1 : 0,
-            paddingLeft: accountHovered ? '6px' : 0,
-            transition: expandTransition,
+          <Typography sx={{
+            fontFamily: '"Raleway", sans-serif', fontSize: '0.63rem', fontWeight: 600,
+            letterSpacing: '0.08em', color: 'text.primary', textTransform: 'uppercase',
+            whiteSpace: 'nowrap', pl: 0.75,
           }}>
-            <Typography sx={{
-              fontFamily: '"Raleway", sans-serif', fontSize: '0.63rem', fontWeight: 600,
-              letterSpacing: '0.08em', color: 'text.primary', textTransform: 'uppercase',
-              whiteSpace: 'nowrap',
-            }}>
-              {emailDomain ?? displayName}
-            </Typography>
-          </Box>
+            {emailDomain ?? displayName}
+          </Typography>
           <ExpandMoreIcon sx={{ fontSize: 14, color: 'text.disabled', flexShrink: 0, ml: 0.5 }} />
         </Box>
 
