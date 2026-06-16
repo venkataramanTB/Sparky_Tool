@@ -81,7 +81,7 @@ export default function LoadingDialog({ open }) {
         <Box sx={{ position: 'relative', width: 180, height: 180, mb: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {/* physics canvas behind the rings */}
           <Box sx={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-            <WelcomePhysics accent={accent} interactive={false} />
+            <WelcomePhysics accent={accent} interactive={false} variant="compact" />
           </Box>
           {/* Outer dashed ring */}
           <Box sx={{
