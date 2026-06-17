@@ -26,6 +26,21 @@ import SuccessCheck from '../components/SuccessCheck'
 
 const PROVIDER_COLORS = { gemini: '#4285f4', openai: '#10a37f', anthropic: '#d4a84b', grok: '#1da1f2', generic: '#888' }
 
+// Apply per-card chart type overrides (from localStorage) to a charts array
+// before sending to the PDF generator, so the PDF matches what the user sees.
+const CHART_OVERRIDES_KEY = 'sparky_chart_type_overrides'
+function applyTypeOverrides(charts) {
+  try {
+    const overrides = JSON.parse(localStorage.getItem(CHART_OVERRIDES_KEY) || '{}')
+    return charts.map((spec) => {
+      const id = spec.id || spec.title
+      return overrides[id] ? { ...spec, type: overrides[id] } : spec
+    })
+  } catch {
+    return charts
+  }
+}
+
 // Compact number formatter: 1,234,567 → "1.2M", 15300 → "15.3K"
 const fmtCompact = (n) => {
   if (n == null) return '—'
@@ -1037,7 +1052,7 @@ export default function AnalyzeDashboard() {
       const blob = await downloadAnalysisPdf({
         filename: filename || 'report',
         summary:  result.summary || '',
-        charts:   result.charts  || [],
+        charts:   applyTypeOverrides(result.charts || []),
         meta:     result.meta    || {},
       })
       const url  = URL.createObjectURL(blob)
