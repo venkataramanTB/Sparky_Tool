@@ -4,11 +4,13 @@ import os as _os
 import time as _time
 import uuid as _uuid
 import paramiko
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 
@@ -113,7 +115,40 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("X-XSS-Protection", "1; mode=block")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
     return response
+
+
+# Simple sliding-window rate limiter for unauthenticated v1 endpoints.
+# v2 endpoints are protected by Clerk JWT; v1 has no auth layer.
+_v1_rate_store: dict[str, list[float]] = defaultdict(list)
+_V1_RATE_WINDOW   = 60.0   # seconds
+_V1_RATE_MAX      = 30     # requests per window per IP
+_V1_RATE_EXCLUDED = {"/api/health", "/api/ping", "/api/ready"}
+
+
+@app.middleware("http")
+async def v1_rate_limit(request: Request, call_next):
+    path = request.url.path
+    if (
+        path.startswith("/api/")
+        and not path.startswith("/api/v2/")
+        and path not in _V1_RATE_EXCLUDED
+    ):
+        ip  = (request.client.host if request.client else "anonymous")
+        now = _time.time()
+        hits = _v1_rate_store[ip]
+        _v1_rate_store[ip] = [t for t in hits if now - t < _V1_RATE_WINDOW]
+        if len(_v1_rate_store[ip]) >= _V1_RATE_MAX:
+            log.warning("rate_limit  ip=%s  path=%s", ip, path)
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests. Please wait before retrying."},
+                headers={"Retry-After": "60"},
+            )
+        _v1_rate_store[ip].append(now)
+    return await call_next(request)
 
 
 @app.middleware("http")

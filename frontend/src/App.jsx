@@ -99,9 +99,24 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      {/* Skip navigation link — visually hidden until focused, for keyboard/screen-reader users */}
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute', left: '-9999px', top: 8, zIndex: 9999,
+          px: 2, py: 1, bgcolor: 'primary.main', color: 'primary.contrastText',
+          borderRadius: '2px', fontFamily: '"Raleway"', fontSize: '0.75rem',
+          fontWeight: 700, textDecoration: 'none', letterSpacing: '0.1em',
+          '&:focus': { left: '50%', transform: 'translateX(-50%)' },
+        }}
+      >
+        Skip to main content
+      </Box>
+
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default' }}>
         <Topbar route={route} navigate={navigate} user={user} onSignOut={signOut} />
-        <Box component="main" sx={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+        <Box id="main-content" component="main" sx={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
           <ErrorBoundary>
             <Suspense fallback={<PageFallback />}>
               {route === 'dashboard'   && <Dashboard />}

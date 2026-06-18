@@ -113,7 +113,15 @@ def _parse_multi_section(text: str) -> list[dict]:
     return sections
 
 
+_MAX_FILE_BYTES = 50 * 1024 * 1024   # 50 MB hard limit
+_MAX_CSV_ROWS   = 500_000             # row cap for standard CSVs
+
+
 def parse_and_compute(csv_bytes: bytes) -> dict[str, Any]:
+    if len(csv_bytes) > _MAX_FILE_BYTES:
+        mb = len(csv_bytes) // (1024 * 1024)
+        raise ValueError(f"File size ({mb} MB) exceeds the 50 MB limit. Split the file before uploading.")
+
     text = csv_bytes.decode('utf-8', errors='replace')
 
     if _is_multi_section(text):
@@ -147,7 +155,7 @@ def parse_and_compute(csv_bytes: bytes) -> dict[str, Any]:
         }
 
     # Standard CSV
-    df = pd.read_csv(io.BytesIO(csv_bytes))
+    df = pd.read_csv(io.BytesIO(csv_bytes), nrows=_MAX_CSV_ROWS)
     kpis: dict[str, Any] = {}
     for col in df.columns:
         if pd.api.types.is_numeric_dtype(df[col]):
