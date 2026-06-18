@@ -132,7 +132,7 @@ function StatusChip({ status, sftp_skipped }) {
       icon={<Icon sx={{ fontSize: '12px !important', color: `${color} !important` }} />}
       label={label}
       size="small"
-      sx={{ bgcolor: bg, color, fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', letterSpacing: '0.05em', height: 22 }}
+      sx={{ bgcolor: bg, color, fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', height: 22 }}
     />
   )
   if (status === 'success' && sftp_skipped) {
@@ -147,20 +147,20 @@ function StatCard({ label, value, sub, Icon, accent }) {
   const theme = useTheme()
   const color = accent || theme.palette.primary.main
   return (
-    <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%', position: 'relative', overflow: 'hidden' }}>
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, bgcolor: color, opacity: 0.55 }} />
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+    <Card variant="outlined" sx={{ bgcolor: 'background.paper', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, bgcolor: color, opacity: 0.75 }} />
+      <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <Box>
-            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.52rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'text.disabled', mb: 0.75 }}>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.disabled', mb: 1 }}>
               {label}
             </Typography>
-            <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>{value}</Typography>
-            {sub && <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.62rem', color: 'text.disabled', mt: 0.75 }}>{sub}</Typography>}
+            <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.2rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>{value}</Typography>
+            {sub && <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.disabled', mt: 0.75 }}>{sub}</Typography>}
           </Box>
           {Icon && (
-            <Box sx={{ width: 32, height: 32, borderRadius: '4px', bgcolor: `${color}14`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-              <Icon sx={{ fontSize: 16, color }} />
+            <Box sx={{ width: 36, height: 36, borderRadius: '6px', bgcolor: `${color}1e`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+              <Icon sx={{ fontSize: 18, color }} />
             </Box>
           )}
         </Box>
@@ -760,7 +760,7 @@ export default function Admin() {
         <Box component="span" sx={{
           minWidth: 18, height: 18, px: 0.5, borderRadius: '9px',
           bgcolor: `${accent}20`, color: 'primary.main',
-          fontFamily: '"JetBrains Mono", monospace', fontSize: '0.55rem',
+          fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
         }}>
           {count}
@@ -780,7 +780,7 @@ export default function Admin() {
       {/* header */}
       <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.54rem', letterSpacing: '0.32em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.28em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
             System
           </Typography>
           <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.4rem', fontWeight: 700, color: 'text.primary', letterSpacing: '0.02em', lineHeight: 1 }}>
@@ -830,7 +830,7 @@ export default function Admin() {
           mb: 3,
           borderBottom: '1px solid',
           borderColor: 'divider',
-          '& .MuiTab-root': { fontFamily: '"Raleway"', fontSize: '0.63rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.secondary', minHeight: 40, gap: 0.5 },
+          '& .MuiTab-root': { fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.secondary', minHeight: 44, gap: 0.5 },
           '& .Mui-selected': { color: 'primary.main' },
           '& .MuiTabs-indicator': { bgcolor: 'primary.main' },
         }}
@@ -1000,7 +1000,7 @@ export default function Admin() {
                               { label: 'Started',     val: fmtDate(r.started_at) },
                             ].map(({ label, val, mono }) => (
                               <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
-                                <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 76, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
+                                <Typography sx={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 76, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
                                 {mono ? <MonoValue val={val} /> : <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{val || '—'}</Typography>}
                               </Box>
                             ))}
@@ -1096,7 +1096,7 @@ export default function Admin() {
                   { field: 'duration_ms', headerName: 'Duration',     width: 110, renderCell: (p) => <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.secondary' }}>{fmtMs(p.value)}</Typography> },
                   { field: 'failed_step', headerName: 'Step',         width: 100,
                     renderCell: (p) => p.value
-                      ? <Chip label={p.value} size="small" sx={{ bgcolor: 'rgba(180,80,80,0.1)', color: '#b45050', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', height: 18 }} />
+                      ? <Chip label={p.value} size="small" sx={{ bgcolor: 'rgba(180,80,80,0.1)', color: '#b45050', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', height: 22 }} />
                       : <Typography sx={{ fontSize: '0.68rem', color: 'text.disabled' }}>—</Typography>,
                   },
                   { field: 'started_at',  headerName: 'Started',      width: 150, renderCell: (p) => <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif', whiteSpace: 'nowrap' }}>{fmtDate(p.value)}</Typography> },
@@ -1127,7 +1127,7 @@ export default function Admin() {
                                 { label: 'Started',     val: fmtDate(r.started_at) },
                               ].filter(({ val }) => val).map(({ label, val, mono }) => (
                                 <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
-                                  <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 76, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
+                                  <Typography sx={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 76, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
                                   {mono ? <MonoValue val={val} /> : <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{val}</Typography>}
                                 </Box>
                               ))}
@@ -1203,7 +1203,7 @@ export default function Admin() {
                               <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.primary', lineHeight: 1.2 }}>{p.value}</Typography>
                               {isSelf && <Chip label="you" size="small" sx={{ height: 14, fontSize: '0.5rem', bgcolor: `${accent}18`, color: 'primary.main', px: 0 }} />}
                             </Box>
-                            <Typography sx={{ fontSize: '0.58rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>{p.row.id.slice(0, 12)}…</Typography>
+                            <Typography sx={{ fontSize: '0.7rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>{p.row.id.slice(0, 12)}…</Typography>
                           </Box>
                         </Box>
                       )
@@ -1264,7 +1264,7 @@ export default function Admin() {
                                   { label: 'Last seen', val: u.last_seen_at ? new Date(u.last_seen_at).toLocaleDateString() : '—' },
                                 ].map(({ label, val, custom }) => (
                                   <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.6, alignItems: 'center' }}>
-                                    <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 70, flexShrink: 0 }}>{label}</Typography>
+                                    <Typography sx={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 70, flexShrink: 0 }}>{label}</Typography>
                                     {custom || <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{val}</Typography>}
                                   </Box>
                                 ))}
@@ -1345,7 +1345,7 @@ export default function Admin() {
                       const t = p.value || ''
                       const bg    = t.startsWith('run') ? 'rgba(100,149,180,0.12)' : t.includes('deleted') ? 'rgba(180,80,80,0.12)' : t.includes('invite') ? 'rgba(107,143,113,0.12)' : t.includes('role') ? `${accent}15` : 'rgba(128,128,128,0.1)'
                       const color = t.startsWith('run') ? '#6495b4'  : t.includes('deleted') ? '#b45050' : t.includes('invite') ? '#6b8f71' : t.includes('role') ? accent : theme.palette.text.secondary
-                      return <Chip label={t} size="small" sx={{ bgcolor: bg, color, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', height: 19 }} />
+                      return <Chip label={t} size="small" sx={{ bgcolor: bg, color, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', height: 22 }} />
                     },
                   },
                   {
@@ -1386,21 +1386,21 @@ export default function Admin() {
                                   <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>
                                     {entry.created_at ? new Date(entry.created_at).toLocaleString() : '—'}
                                   </Typography>
-                                  <Chip label={t || '—'} size="small" sx={{ bgcolor: chipBg, color: chipColor, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', height: 19 }} />
+                                  <Chip label={t || '—'} size="small" sx={{ bgcolor: chipBg, color: chipColor, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', height: 22 }} />
                                 </Box>
                                 {[
                                   { label: 'User', val: entry.user_name },
                                   { label: 'IP',   val: entry.ip_address },
                                 ].map(({ label, val }) => (
                                   <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
-                                    <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 50, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
+                                    <Typography sx={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 50, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
                                     <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary', fontFamily: '"Raleway", sans-serif' }}>{val || '—'}</Typography>
                                   </Box>
                                 ))}
                                 {entry.detail && (
                                   <Box sx={{ mt: 1 }}>
-                                    <Typography sx={{ fontSize: '0.53rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', mb: 0.3 }}>Detail</Typography>
-                                    <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.62rem', color: 'text.secondary', wordBreak: 'break-all', bgcolor: 'background.paper', p: 0.75, borderRadius: '2px', border: '1px solid', borderColor: 'divider' }}>
+                                    <Typography sx={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', mb: 0.3 }}>Detail</Typography>
+                                    <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.secondary', wordBreak: 'break-all', bgcolor: 'background.paper', p: 0.75, borderRadius: '4px', border: '1px solid', borderColor: 'divider' }}>
                                       {JSON.stringify(entry.detail)}
                                     </Typography>
                                   </Box>
@@ -1606,7 +1606,7 @@ export default function Admin() {
                     field: 'status', headerName: 'Status', width: 100,
                     renderCell: (p) => {
                       const col = p.value === 'success' ? '#6b8f71' : p.value === 'failed' ? '#b45050' : p.value === 'running' ? accent : 'text.secondary'
-                      return <Chip label={p.value} size="small" sx={{ bgcolor: `${col}18`, color: col, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', height: 19 }} />
+                      return <Chip label={p.value} size="small" sx={{ bgcolor: `${col}18`, color: col, fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', height: 22 }} />
                     },
                   },
                   {

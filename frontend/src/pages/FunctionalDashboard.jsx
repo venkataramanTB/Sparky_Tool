@@ -45,9 +45,9 @@ function categoriseModule(name) {
 
 function CardHeader({ icon: Icon, label, accent }) {
   return (
-    <Box sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-      {Icon && <Icon sx={{ fontSize: 14, color: accent }} />}
-      <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.secondary' }}>
+    <Box sx={{ px: 2.5, pt: 2.5, pb: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.25 }}>
+      {Icon && <Icon sx={{ fontSize: 16, color: accent }} />}
+      <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary' }}>
         {label}
       </Typography>
     </Box>
@@ -58,16 +58,16 @@ function CardHeader({ icon: Icon, label, accent }) {
 
 function KpiCard({ label, value, color, sub }) {
   return (
-    <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%', overflow: 'hidden', position: 'relative' }}>
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, bgcolor: color, opacity: 0.65 }} />
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Typography sx={{ fontSize: '0.52rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'text.disabled', mb: 0.75 }}>
+    <Card variant="outlined" sx={{ bgcolor: 'background.paper', height: '100%', overflow: 'hidden', position: 'relative' }}>
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, bgcolor: color, opacity: 0.75 }} />
+      <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.disabled', mb: 1 }}>
           {label}
         </Typography>
-        <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
+        <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.2rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
           {value}
         </Typography>
-        {sub && <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', mt: 0.5, fontFamily: '"Raleway", sans-serif' }}>{sub}</Typography>}
+        {sub && <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.secondary', mt: 0.75 }}>{sub}</Typography>}
       </CardContent>
     </Card>
   )
@@ -101,7 +101,7 @@ function ModuleDonut({ on, off, accent, theme }) {
             <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
               {pct}%
             </Typography>
-            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.55rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.disabled', mt: 0.25 }}>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', mt: 0.4 }}>
               enabled
             </Typography>
           </Box>
@@ -146,18 +146,18 @@ function AdoptionGauge({ on, off, accent, theme }) {
           />
           <Box sx={{ position: 'absolute', bottom: 4, left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.9rem', fontWeight: 700, color: COLOR_ON, lineHeight: 1 }}>{pct}%</Typography>
-            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.55rem', color: 'text.disabled', letterSpacing: '0.14em', textTransform: 'uppercase' }}>of modules on</Typography>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', color: 'text.disabled', letterSpacing: '0.12em', textTransform: 'uppercase' }}>of modules on</Typography>
           </Box>
         </Box>
         <Divider sx={{ width: '100%', my: 1.5 }} />
         <Box sx={{ display: 'flex', justifyContent: 'space-around', width: '100%' }}>
           <Box sx={{ textAlign: 'center' }}>
             <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.4rem', fontWeight: 700, color: COLOR_ON }}>{on}</Typography>
-            <Typography sx={{ fontSize: '0.56rem', color: 'text.disabled', letterSpacing: '0.12em', textTransform: 'uppercase' }}>active</Typography>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', color: 'text.disabled', letterSpacing: '0.1em', textTransform: 'uppercase' }}>active</Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
             <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.4rem', fontWeight: 700, color: COLOR_OFF }}>{off}</Typography>
-            <Typography sx={{ fontSize: '0.56rem', color: 'text.disabled', letterSpacing: '0.12em', textTransform: 'uppercase' }}>inactive</Typography>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', color: 'text.disabled', letterSpacing: '0.1em', textTransform: 'uppercase' }}>inactive</Typography>
           </Box>
         </Box>
       </Box>

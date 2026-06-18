@@ -50,7 +50,7 @@ const EMPTY = {
 function Field({ label, children }) {
   return (
     <Box>
-      <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'text.secondary', mb: 0.8 }}>
+      <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary', mb: 1 }}>
         {label}
       </Typography>
       {children}
@@ -91,7 +91,7 @@ function SectionCard({ number, title, subtitle, complete, children }) {
           <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.25rem', fontWeight: 600, color: 'text.primary', letterSpacing: '0.03em', lineHeight: 1.2 }}>
             {title}
           </Typography>
-          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', letterSpacing: '0.13em', color: 'text.disabled', mt: 0.25 }}>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', letterSpacing: '0.1em', color: 'text.disabled', mt: 0.3 }}>
             {subtitle}
           </Typography>
         </Box>

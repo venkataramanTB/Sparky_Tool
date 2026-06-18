@@ -83,10 +83,10 @@ function StatusPill({ status, sftp_skipped }) {
   }
   return (
     <Chip
-      icon={<Icon sx={{ fontSize: '11px !important', color: `${color} !important` }} />}
+      icon={<Icon sx={{ fontSize: '13px !important', color: `${color} !important` }} />}
       label={label}
       size="small"
-      sx={{ bgcolor: bg, color, fontFamily: '"Raleway", sans-serif', fontSize: '0.58rem', letterSpacing: '0.05em', height: 20 }}
+      sx={{ bgcolor: bg, color, fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', height: 22 }}
     />
   )
 }
@@ -97,17 +97,17 @@ function KpiCard({ label, value, sub, Icon, accent, mono }) {
   const theme = useTheme()
   const accentColor = accent || theme.palette.primary.main
   return (
-    <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%', position: 'relative', overflow: 'hidden' }}>
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', bgcolor: accentColor, opacity: 0.55 }} />
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+    <Card variant="outlined" sx={{ bgcolor: 'background.paper', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, bgcolor: accentColor, opacity: 0.75 }} />
+      <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <Box>
-            <Typography sx={{ fontSize: '0.54rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'text.disabled', mb: 1 }}>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.disabled', mb: 1 }}>
               {label}
             </Typography>
             <Typography sx={{
               fontFamily: mono ? '"JetBrains Mono", monospace' : '"Cormorant Garamond", serif',
-              fontSize: mono ? '1.15rem' : '2.1rem',
+              fontSize: mono ? '1.25rem' : '2.2rem',
               fontWeight: 700,
               color: 'text.primary',
               lineHeight: 1,
@@ -115,12 +115,12 @@ function KpiCard({ label, value, sub, Icon, accent, mono }) {
               {value}
             </Typography>
             {sub && (
-              <Typography sx={{ fontSize: '0.62rem', color: 'text.secondary', mt: 0.75, fontFamily: '"Raleway", sans-serif' }}>{sub}</Typography>
+              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.secondary', mt: 0.75 }}>{sub}</Typography>
             )}
           </Box>
           {Icon && (
-            <Box sx={{ width: 32, height: 32, borderRadius: '4px', bgcolor: `${accentColor}14`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-              <Icon sx={{ fontSize: 16, color: accentColor }} />
+            <Box sx={{ width: 36, height: 36, borderRadius: '6px', bgcolor: `${accentColor}1e`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+              <Icon sx={{ fontSize: 18, color: accentColor }} />
             </Box>
           )}
         </Box>
@@ -131,8 +131,8 @@ function KpiCard({ label, value, sub, Icon, accent, mono }) {
 
 // ── table cell styles ─────────────────────────────────────────────────────────
 
-const cellSx = { fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.primary',   borderColor: 'divider', py: 1.25 }
-const headSx = { fontFamily: '"Raleway", sans-serif', fontSize: '0.57rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.secondary', borderColor: 'divider', py: 1.25, bgcolor: 'background.default' }
+const cellSx = { fontFamily: '"Raleway", sans-serif', fontSize: '0.8rem',  color: 'text.primary',   borderColor: 'divider', py: 1.5 }
+const headSx = { fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.secondary', borderColor: 'divider', py: 1.5, bgcolor: 'background.default' }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
@@ -312,10 +312,10 @@ export default function Dashboard() {
         {/* ── header ────────────────────────────────────────────────────────── */}
         <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', mb: 4, flexWrap: 'wrap', gap: 2.5 }}>
           <Box>
-            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.54rem', letterSpacing: '0.32em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.28em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
               Sparky Platform
             </Typography>
-            <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.4rem', fontWeight: 700, color: 'text.primary', letterSpacing: '0.02em', lineHeight: 1 }}>
+            <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.6rem', fontWeight: 700, color: 'text.primary', letterSpacing: '0.02em', lineHeight: 1 }}>
               Dashboard
             </Typography>
           </Box>
@@ -396,11 +396,12 @@ export default function Dashboard() {
               borderBottom: 'none',
               '& .MuiTab-root': {
                 fontFamily: '"Raleway", sans-serif',
-                fontSize: '0.63rem',
-                letterSpacing: '0.12em',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
                 textTransform: 'uppercase',
                 color: 'text.secondary',
-                minHeight: 40,
+                minHeight: 44,
               },
               '& .Mui-selected':      { color: accent },
               '& .MuiTabs-indicator': { bgcolor: accent },
@@ -535,11 +536,11 @@ export default function Dashboard() {
           <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', mb: 5 }}>
             {/* Header */}
             <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-              <CloudSyncIcon sx={{ fontSize: 14, color: 'primary.main' }} />
-              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.primary' }}>
+              <CloudSyncIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.primary' }}>
                 Recent Runs
               </Typography>
-              <Chip label={runs.length} size="small" sx={{ height: 16, fontSize: '0.55rem', fontFamily: '"JetBrains Mono", monospace', bgcolor: `${accent}18`, color: 'primary.main' }} />
+              <Chip label={runs.length} size="small" sx={{ height: 20, fontSize: '0.68rem', fontFamily: '"JetBrains Mono", monospace', bgcolor: `${accent}1e`, color: 'primary.main' }} />
               <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
                 {runOutputs.length >= 2 && (
                   <Tooltip title="Compare two runs side by side" arrow>
@@ -580,7 +581,7 @@ export default function Dashboard() {
                     renderCell: (p) => (
                       <Box>
                         <Typography sx={{ fontSize: '0.74rem', fontFamily: '"Raleway", sans-serif', color: 'text.primary' }}>{p.row.config_name || '—'}</Typography>
-                        {p.row.ps_process_name && <Typography sx={{ fontSize: '0.58rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>{p.row.ps_process_name}</Typography>}
+                        {p.row.ps_process_name && <Typography sx={{ fontSize: '0.7rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>{p.row.ps_process_name}</Typography>}
                       </Box>
                     ),
                   },
@@ -618,13 +619,13 @@ export default function Dashboard() {
                             <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', fontWeight: 700, color: 'text.primary' }}>{r.config_name || '—'}</Typography>
                             <StatusPill status={r.status} sftp_skipped={r.sftp_skipped} />
                           </Box>
-                          {r.ps_process_name && <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace', mb: 1.5 }}>{r.ps_process_name}</Typography>}
+                          {r.ps_process_name && <Typography sx={{ fontSize: '0.72rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace', mb: 1.5 }}>{r.ps_process_name}</Typography>}
                           {[
                             { label: 'Instance ID', val: r.instance_id, mono: true },
                             { label: 'Report ID',   val: r.report_id,   mono: true },
                           ].map(({ label, val, mono }) => (
                             <Box key={label} sx={{ display: 'flex', gap: 1, mb: 0.75, alignItems: 'flex-start' }}>
-                              <Typography sx={{ fontSize: '0.54rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', minWidth: 80, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
+                              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.disabled', minWidth: 80, flexShrink: 0, pt: 0.1 }}>{label}</Typography>
                               <MonoCopy val={val} />
                             </Box>
                           ))}
@@ -635,8 +636,8 @@ export default function Dashboard() {
                               { label: 'When',     val: r.status === 'running' ? 'Running…' : timeAgo(r.started_at) },
                             ].map(({ label, val }) => (
                               <Box key={label}>
-                                <Typography sx={{ fontSize: '0.52rem', color: 'text.disabled', fontFamily: '"Raleway", sans-serif', letterSpacing: '0.12em', textTransform: 'uppercase' }}>{label}</Typography>
-                                <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.secondary' }}>{val}</Typography>
+                                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.disabled' }}>{label}</Typography>
+                                <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.78rem', color: 'text.secondary' }}>{val}</Typography>
                               </Box>
                             ))}
                           </Box>

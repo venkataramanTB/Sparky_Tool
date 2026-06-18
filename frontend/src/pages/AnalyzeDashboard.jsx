@@ -60,33 +60,31 @@ function StatCard({ label, value, sub, Icon, color }) {
   const accent = color || theme.palette.primary.main
   return (
     <Card variant="outlined" sx={{
-      bgcolor: 'background.paper', borderColor: 'divider',
+      bgcolor: 'background.paper',
       height: '100%', position: 'relative', overflow: 'hidden',
     }}>
-      {/* coloured accent stripe at top — each card gets a distinct colour so
-          users can scan the row at a glance without reading the labels */}
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, bgcolor: accent, opacity: 0.55 }} />
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, bgcolor: accent, opacity: 0.75 }} />
+      <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box>
             <Typography sx={{
-              fontFamily: '"Raleway", sans-serif', fontSize: '0.52rem',
-              letterSpacing: '0.22em', textTransform: 'uppercase',
-              color: 'text.disabled', mb: 0.75,
+              fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem',
+              fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+              color: 'text.disabled', mb: 1,
             }}>
               {label}
             </Typography>
             <Typography sx={{
               fontFamily: '"Cormorant Garamond", serif',
-              fontSize: '2rem', fontWeight: 700,
+              fontSize: '2.2rem', fontWeight: 700,
               color: 'text.primary', lineHeight: 1,
             }}>
               {value}
             </Typography>
             {sub && (
               <Typography sx={{
-                fontSize: '0.62rem', color: 'text.secondary',
-                mt: 0.75, fontFamily: '"Raleway", sans-serif',
+                fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.secondary',
+                mt: 0.75,
               }}>
                 {sub}
               </Typography>
@@ -94,8 +92,8 @@ function StatCard({ label, value, sub, Icon, color }) {
           </Box>
           {Icon && (
             <Box sx={{
-              width: 32, height: 32, borderRadius: '4px',
-              bgcolor: `${accent}14`, display: 'grid',
+              width: 36, height: 36, borderRadius: '6px',
+              bgcolor: `${accent}1e`, display: 'grid',
               placeItems: 'center', flexShrink: 0,
             }}>
               <Icon sx={{ fontSize: 16, color: accent }} />

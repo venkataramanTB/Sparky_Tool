@@ -46,7 +46,7 @@ function SectionCard({ title, children }) {
       '&:hover': { boxShadow: `0 4px 20px ${accent}12` },
     }}>
       <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'text.secondary', mb: 2 }}>
+        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary', mb: 2.5 }}>
           {title}
         </Typography>
         {children}
@@ -60,7 +60,7 @@ function Row({ label, sub, children }) {
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1.25, gap: 2, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 'none' } }}>
       <Box>
         <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.78rem', color: 'text.primary' }}>{label}</Typography>
-        {sub && <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.62rem', color: 'text.disabled', mt: 0.2 }}>{sub}</Typography>}
+        {sub && <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.disabled', mt: 0.25 }}>{sub}</Typography>}
       </Box>
       <Box sx={{ flexShrink: 0 }}>{children}</Box>
     </Box>
@@ -154,7 +154,7 @@ export default function Preferences() {
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', mb: 4, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.54rem', letterSpacing: '0.32em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.28em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
             Account
           </Typography>
           <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.4rem', fontWeight: 700, color: 'text.primary', letterSpacing: '0.02em', lineHeight: 1 }}>

@@ -92,12 +92,12 @@ export default function HistorySidebar({ runs = [], runOutputs = [], accent }) {
             }
             <Typography sx={{
               fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-              fontSize: '0.56rem', letterSpacing: '0.18em', textTransform: 'uppercase',
+              fontSize: '0.68rem', letterSpacing: '0.14em', textTransform: 'uppercase',
               color: pOpen ? accent : 'text.disabled', flex: 1,
             }}>
               {period}
             </Typography>
-            <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.54rem', color: 'text.disabled' }}>
+            <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.66rem', color: 'text.disabled' }}>
               {total}
             </Typography>
           </Box>
@@ -129,7 +129,7 @@ export default function HistorySidebar({ runs = [], runOutputs = [], accent }) {
                   }}>
                     {name}
                   </Typography>
-                  <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.52rem', color: 'text.disabled' }}>
+                  <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.64rem', color: 'text.disabled' }}>
                     {items.length}
                   </Typography>
                 </Box>
@@ -147,10 +147,10 @@ export default function HistorySidebar({ runs = [], runOutputs = [], accent }) {
                     >
                       <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: statusColor, flexShrink: 0 }} />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.59rem', color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.7rem', color: 'text.secondary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {run.instance_id || `#${run.id}`}
                         </Typography>
-                        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.54rem', color: 'text.disabled' }}>
+                        <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.64rem', color: 'text.disabled' }}>
                           {timeAgo(run.started_at)}
                         </Typography>
                       </Box>
@@ -168,11 +168,11 @@ export default function HistorySidebar({ runs = [], runOutputs = [], accent }) {
                       {o.display_name}
                     </Typography>
                     {(o.row_count || o.file_size_bytes) && (
-                      <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.54rem', color: 'text.disabled' }}>
+                      <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.66rem', color: 'text.disabled' }}>
                         {[o.row_count && `${o.row_count.toLocaleString()} rows`, fmtBytes(o.file_size_bytes)].filter(Boolean).join(' · ')}
                       </Typography>
                     )}
-                    <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.53rem', color: 'text.disabled' }}>
+                    <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.64rem', color: 'text.disabled' }}>
                       {timeAgo(o.created_at)}
                     </Typography>
                   </Box>
@@ -215,7 +215,7 @@ export default function HistorySidebar({ runs = [], runOutputs = [], accent }) {
         {!collapsed && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
             <HistoryIcon sx={{ fontSize: 13, color: accent }} />
-            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.57rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: 'text.secondary' }}>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.68rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary' }}>
               History
             </Typography>
           </Box>
@@ -240,7 +240,7 @@ export default function HistorySidebar({ runs = [], runOutputs = [], accent }) {
         <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Typography sx={{
             fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-            fontSize: '0.55rem', letterSpacing: '0.22em', textTransform: 'uppercase',
+            fontSize: '0.68rem', letterSpacing: '0.16em', textTransform: 'uppercase',
             color: 'text.disabled', writingMode: 'vertical-rl', transform: 'rotate(180deg)',
           }}>
             History
@@ -261,8 +261,8 @@ export default function HistorySidebar({ runs = [], runOutputs = [], accent }) {
                 minHeight: 34,
                 '& .MuiTab-root': {
                   minHeight: 34, py: 0,
-                  fontFamily: '"Raleway", sans-serif', fontSize: '0.57rem',
-                  letterSpacing: '0.12em', textTransform: 'uppercase', color: 'text.secondary',
+                  fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem',
+                  letterSpacing: '0.1em', textTransform: 'uppercase', color: 'text.secondary',
                 },
                 '& .Mui-selected': { color: accent },
                 '& .MuiTabs-indicator': { bgcolor: accent, height: '1.5px' },

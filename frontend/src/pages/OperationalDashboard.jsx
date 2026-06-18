@@ -47,26 +47,26 @@ function timeAgo(ts) {
 function KpiCard({ label, value, sub, Icon, color }) {
   const c = color || '#c9a84c'
   return (
-    <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%', position: 'relative', overflow: 'hidden' }}>
-      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, bgcolor: c, opacity: 0.55 }} />
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+    <Card variant="outlined" sx={{ bgcolor: 'background.paper', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, bgcolor: c, opacity: 0.75 }} />
+      <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box>
-            <Typography sx={{ fontSize: '0.52rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'text.disabled', mb: 0.75 }}>
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.disabled', mb: 1 }}>
               {label}
             </Typography>
-            <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
+            <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.2rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
               {value}
             </Typography>
             {sub && (
-              <Typography sx={{ fontSize: '0.62rem', color: 'text.secondary', mt: 0.75, fontFamily: '"Raleway", sans-serif' }}>
+              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.secondary', mt: 0.75 }}>
                 {sub}
               </Typography>
             )}
           </Box>
           {Icon && (
-            <Box sx={{ width: 32, height: 32, borderRadius: '4px', bgcolor: `${c}14`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-              <Icon sx={{ fontSize: 16, color: c }} />
+            <Box sx={{ width: 36, height: 36, borderRadius: '6px', bgcolor: `${c}1e`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+              <Icon sx={{ fontSize: 18, color: c }} />
             </Box>
           )}
         </Box>
@@ -229,8 +229,8 @@ export default function OperationalDashboard() {
           <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%', width: '100%' }}>
             <Box sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <WifiIcon sx={{ fontSize: 14, color: accent }} />
-                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.secondary' }}>
+                <WifiIcon sx={{ fontSize: 16, color: accent }} />
+                <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary' }}>
                   Connection Health
                 </Typography>
               </Box>
@@ -256,7 +256,7 @@ export default function OperationalDashboard() {
                     <Box key={lbl} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1.5, py: 1.2, borderRadius: '3px', bgcolor: 'rgba(128,128,128,0.04)' }}>
                       <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#555', flexShrink: 0 }} />
                       <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', color: 'text.disabled', flex: 1 }}>{lbl}</Typography>
-                      <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.64rem', color: 'text.disabled' }}>Not checked</Typography>
+                      <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.72rem', color: 'text.disabled' }}>Not checked</Typography>
                     </Box>
                   ))}
                 </>
@@ -268,9 +268,9 @@ export default function OperationalDashboard() {
         {/* ── Failures by step ──────────────────────────────────────────── */}
         <Grid item xs={12} md={4} sx={{ display: 'flex' }}>
           <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%', width: '100%' }}>
-            <Box sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <WarningAmberIcon sx={{ fontSize: 14, color: accent }} />
-              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.secondary' }}>
+            <Box sx={{ px: 2.5, pt: 2.5, pb: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.25 }}>
+              <WarningAmberIcon sx={{ fontSize: 16, color: accent }} />
+              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary' }}>
                 Failures by Step
               </Typography>
             </Box>
@@ -303,9 +303,9 @@ export default function OperationalDashboard() {
         {/* ── Recent error log ──────────────────────────────────────────── */}
         <Grid item xs={12} md={4} sx={{ display: 'flex' }}>
           <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', height: '100%', width: '100%' }}>
-            <Box sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <ErrorOutlineIcon sx={{ fontSize: 14, color: accent }} />
-              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'text.secondary' }}>
+            <Box sx={{ px: 2.5, pt: 2.5, pb: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1.25 }}>
+              <ErrorOutlineIcon sx={{ fontSize: 16, color: accent }} />
+              <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary' }}>
                 Recent Errors
               </Typography>
             </Box>
@@ -316,15 +316,15 @@ export default function OperationalDashboard() {
                     <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', color: 'text.primary', fontWeight: 600 }}>
                       {r.config_name || '—'}
                     </Typography>
-                    <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.6rem', color: 'text.disabled' }}>
+                    <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', color: 'text.disabled' }}>
                       {timeAgo(r.started_at)}
                     </Typography>
                   </Box>
                   {r.failed_step && (
-                    <Chip label={r.failed_step} size="small" sx={{ height: 16, fontSize: '0.52rem', bgcolor: 'rgba(180,80,80,0.12)', color: '#b45050', fontFamily: '"JetBrains Mono", monospace', mr: 0.5 }} />
+                    <Chip label={r.failed_step} size="small" sx={{ height: 20, fontSize: '0.68rem', bgcolor: 'rgba(180,80,80,0.12)', color: '#b45050', fontFamily: '"JetBrains Mono", monospace', mr: 0.5 }} />
                   )}
                   {r.error_detail && (
-                    <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.58rem', color: 'text.disabled', mt: 0.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <Typography sx={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.68rem', color: 'text.disabled', mt: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {r.error_detail}
                     </Typography>
                   )}
@@ -343,9 +343,9 @@ export default function OperationalDashboard() {
       {/* ── 30-day run health chart ───────────────────────────────────── */}
       {runsByDay.length > 0 && (
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderColor: 'divider', p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-            <BarChartIcon sx={{ fontSize: 16, color: accent }} />
-            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.primary' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 2.5 }}>
+            <BarChartIcon sx={{ fontSize: 18, color: accent }} />
+            <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'text.primary' }}>
               Run Health — Last 30 Days
             </Typography>
           </Box>

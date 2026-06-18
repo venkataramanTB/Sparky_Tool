@@ -59,7 +59,7 @@ export default function KPICards({ kpis = {} }) {
               <Box sx={{ p: 2.5 }}>
                 <Typography sx={{
                   fontFamily: '"Raleway", sans-serif',
-                  fontSize: '0.58rem', fontWeight: 700,
+                  fontSize: '0.7rem', fontWeight: 700,
                   letterSpacing: '0.26em', color: textMuted,
                   textTransform: 'uppercase', mb: 2.5,
                 }}>
@@ -75,7 +75,7 @@ export default function KPICards({ kpis = {} }) {
                 </Typography>
                 <Typography sx={{
                   fontFamily: '"Raleway", sans-serif',
-                  fontSize: '0.55rem', letterSpacing: '0.22em',
+                  fontSize: '0.68rem', letterSpacing: '0.18em',
                   color: textDisabled, textTransform: 'uppercase', mb: 2.5,
                 }}>
                   Average

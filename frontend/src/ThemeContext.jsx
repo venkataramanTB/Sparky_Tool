@@ -70,10 +70,9 @@ function buildTheme(mode, accent) {
       text: {
         primary:   dark ? '#ede8d0' : '#1a1814',
         secondary: dark ? '#7a7060' : '#6b6050',
-        disabled:  dark ? '#3a3428' : '#b0a898',
+        disabled:  dark ? '#5c5248' : '#a09888',
       },
-      // Dividers derive from the accent so they subtly match the active colour.
-      divider:    dark ? `${accent}1a` : `${accent}22`,
+      divider:    dark ? `${accent}28` : `${accent}30`,
       success:    { main: '#6b8f71' },
       error:      { main: '#8f4a4a' },
       warning:    { main: accent },
@@ -91,25 +90,33 @@ function buildTheme(mode, accent) {
       MuiCard: {
         styleOverrides: {
           root: {
-            borderRadius: 2,
+            borderRadius: 10,
             backgroundImage: 'none',
-            border: `1px solid ${dark ? `${accent}14` : `${accent}1c`}`,
+            border: `1px solid ${dark ? `${accent}26` : `${accent}32`}`,
+            boxShadow: dark
+              ? '0 2px 16px rgba(0,0,0,0.45), 0 0 0 0 transparent'
+              : '0 1px 8px rgba(0,0,0,0.07), 0 0 0 0 transparent',
+            transition: 'box-shadow 0.22s ease, border-color 0.22s ease',
           },
         },
       },
       MuiPaper: {
-        styleOverrides: { root: { borderRadius: 2, backgroundImage: 'none' } },
+        styleOverrides: { root: { borderRadius: 10, backgroundImage: 'none' } },
       },
       MuiButton: {
         styleOverrides: {
-          root: { borderRadius: 1, textTransform: 'none', fontWeight: 700, letterSpacing: '0.1em' },
+          root: { borderRadius: 6, textTransform: 'none', fontWeight: 700, letterSpacing: '0.08em' },
+          containedPrimary: {
+            boxShadow: `0 2px 14px ${accent}33`,
+            '&:hover': { boxShadow: `0 4px 22px ${accent}55` },
+          },
         },
       },
       MuiDialog: {
         styleOverrides: {
           paper: {
-            borderRadius: 2,
-            border: `1px solid ${dark ? `${accent}2e` : `${accent}24`}`,
+            borderRadius: 12,
+            border: `1px solid ${dark ? `${accent}30` : `${accent}28`}`,
             backgroundImage: 'none',
             background: dark ? '#111316' : '#ffffff',
           },
@@ -118,8 +125,9 @@ function buildTheme(mode, accent) {
       MuiTableCell: {
         styleOverrides: {
           root: {
-            borderColor: dark ? `${accent}12` : `${accent}1c`,
+            borderColor: dark ? `${accent}1e` : `${accent}2a`,
             fontFamily: '"Raleway", sans-serif',
+            fontSize: '0.8rem',
           },
         },
       },
@@ -147,7 +155,7 @@ function buildTheme(mode, accent) {
       },
       MuiAlert: {
         styleOverrides: {
-          root: { borderRadius: 2, fontFamily: '"Raleway", sans-serif' },
+          root: { borderRadius: 8, fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem' },
         },
       },
       MuiAppBar: {
@@ -157,7 +165,8 @@ function buildTheme(mode, accent) {
         styleOverrides: {
           root: {
             fontFamily: '"Raleway", sans-serif',
-            borderRadius: 2,
+            borderRadius: 6,
+            fontSize: '0.72rem',
           },
         },
       },
@@ -165,10 +174,11 @@ function buildTheme(mode, accent) {
         styleOverrides: {
           tooltip: {
             fontFamily: '"Raleway", sans-serif',
-            fontSize: '0.68rem',
+            fontSize: '0.72rem',
+            borderRadius: 6,
             backgroundColor: dark ? '#1e2128' : '#2b2b2b',
             color: dark ? '#ede8d0' : '#f5f0e8',
-            border: `1px solid ${accent}22`,
+            border: `1px solid ${accent}28`,
           },
           arrow: { color: dark ? '#1e2128' : '#2b2b2b' },
         },
@@ -177,10 +187,10 @@ function buildTheme(mode, accent) {
         styleOverrides: {
           root: {
             fontFamily: '"Raleway", sans-serif',
-            fontSize: '0.75rem',
-            '&:hover': { backgroundColor: `${accent}0a` },
-            '&.Mui-selected': { backgroundColor: `${accent}14` },
-            '&.Mui-selected:hover': { backgroundColor: `${accent}1c` },
+            fontSize: '0.8rem',
+            '&:hover': { backgroundColor: `${accent}0e` },
+            '&.Mui-selected': { backgroundColor: `${accent}18` },
+            '&.Mui-selected:hover': { backgroundColor: `${accent}22` },
           },
         },
       },

@@ -129,7 +129,7 @@ export default function SchedulesPage() {
 
       <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', mb: 4 }}>
         <Box>
-          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.54rem', letterSpacing: '0.32em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.28em', color: 'text.disabled', textTransform: 'uppercase', mb: 0.5 }}>
             Automation
           </Typography>
           <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '2.4rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
@@ -186,14 +186,14 @@ export default function SchedulesPage() {
                 boxShadow: `0 4px 20px ${accent}10`,
               },
             }}>
-              <Box sx={{ height: 2, bgcolor: s.is_active ? accent : 'divider', opacity: 0.6 }} />
+              <Box sx={{ height: 3, bgcolor: s.is_active ? accent : 'text.disabled', opacity: 0.7 }} />
               <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                   <Box sx={{ flex: 1, mr: 1 }}>
                     <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontWeight: 700, fontSize: '0.85rem', color: 'text.primary' }}>
                       {s.label || configs.find((c) => c.id === s.config_id)?.name || `Config #${s.config_id}`}
                     </Typography>
-                    <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.65rem', color: 'text.secondary', mt: 0.4 }}>
+                    <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.76rem', color: 'text.secondary', mt: 0.5 }}>
                       {scheduleDescription(s)}
                     </Typography>
                   </Box>
@@ -207,18 +207,18 @@ export default function SchedulesPage() {
                   <Chip
                     label={FREQ_LABELS[s.frequency] || s.frequency}
                     size="small"
-                    sx={{ height: 18, fontSize: '0.58rem', bgcolor: `${accent}14`, color: accent, fontFamily: '"Raleway", sans-serif' }}
+                    sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700, bgcolor: `${accent}1e`, color: accent, fontFamily: '"Raleway", sans-serif' }}
                   />
                   <Chip
                     label={s.is_active ? 'Active' : 'Paused'}
                     size="small"
-                    sx={{ height: 18, fontSize: '0.58rem',
+                    sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700,
                       bgcolor: s.is_active ? 'rgba(107,143,113,0.14)' : 'rgba(90,80,64,0.14)',
                       color: s.is_active ? '#6b8f71' : '#5a5040',
                       fontFamily: '"Raleway", sans-serif' }}
                   />
-                  {s.last_status === 'success' && <Chip icon={<CheckCircleIcon sx={{ fontSize: '11px !important', color: '#6b8f71 !important' }} />} label="Last: OK" size="small" sx={{ height: 18, fontSize: '0.58rem', bgcolor: 'rgba(107,143,113,0.10)', color: '#6b8f71' }} />}
-                  {s.last_status === 'error'   && <Chip icon={<ErrorOutlineIcon sx={{ fontSize: '11px !important', color: '#b45050 !important' }} />} label="Last: Error" size="small" sx={{ height: 18, fontSize: '0.58rem', bgcolor: 'rgba(180,80,80,0.10)', color: '#b45050' }} />}
+                  {s.last_status === 'success' && <Chip icon={<CheckCircleIcon sx={{ fontSize: '13px !important', color: '#6b8f71 !important' }} />} label="Last: OK" size="small" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700, bgcolor: 'rgba(107,143,113,0.12)', color: '#6b8f71' }} />}
+                  {s.last_status === 'error'   && <Chip icon={<ErrorOutlineIcon sx={{ fontSize: '13px !important', color: '#b45050 !important' }} />} label="Last: Error" size="small" sx={{ height: 22, fontSize: '0.7rem', fontWeight: 700, bgcolor: 'rgba(180,80,80,0.12)', color: '#b45050' }} />}
                 </Box>
 
                 {s.next_run_at && (

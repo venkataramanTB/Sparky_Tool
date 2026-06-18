@@ -163,7 +163,7 @@ function LoadingView({ activeStep, completedSteps, phase, elapsed, accent, model
           }}
         />
         <Typography sx={{
-          fontSize: '0.58rem', color: 'text.disabled',
+          fontSize: '0.7rem', color: 'text.disabled',
           fontFamily: '"Raleway", sans-serif',
           letterSpacing: '0.14em', mt: 0.75, textAlign: 'right',
         }}>
@@ -231,7 +231,7 @@ function ExecutiveReportHeader({ runResult, analysisResult, accent }) {
               {dateLabel}
             </Typography>
             {modelLabel && (
-              <Chip label={modelLabel} size="small" sx={{ bgcolor: `${accent}12`, color: accent, fontSize: '0.54rem', height: 16 }} />
+              <Chip label={modelLabel} size="small" sx={{ bgcolor: `${accent}1e`, color: accent, fontSize: '0.68rem', height: 22 }} />
             )}
             {runResult?.runs?.[0]?.duration_ms && (
               <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', fontFamily: '"JetBrains Mono", monospace' }}>
@@ -244,9 +244,9 @@ function ExecutiveReportHeader({ runResult, analysisResult, accent }) {
           label="EXECUTIVE REPORT"
           size="small"
           sx={{
-            bgcolor: `${accent}14`, color: accent,
-            fontSize: '0.52rem', fontWeight: 700, letterSpacing: '0.18em',
-            height: 20, fontFamily: '"Raleway", sans-serif',
+            bgcolor: `${accent}1e`, color: accent,
+            fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.14em',
+            height: 22, fontFamily: '"Raleway", sans-serif',
           }}
         />
       </Box>
@@ -312,7 +312,7 @@ function KPIBar({ runResult, analysisResult, accent }) {
           }}>
             <CardContent sx={{ p: '16px 20px', '&:last-child': { pb: '16px' } }}>
               <Typography sx={{
-                fontSize: '0.52rem', letterSpacing: '0.2em', textTransform: 'uppercase',
+                fontSize: '0.68rem', letterSpacing: '0.16em', textTransform: 'uppercase',
                 color: 'text.disabled', fontFamily: '"Raleway", sans-serif', mb: 0.75,
               }}>
                 {label}
@@ -351,7 +351,7 @@ function ExecutiveSummary({ analysisResult, accent }) {
           <AutoAwesomeIcon sx={{ fontSize: 13, color: accent }} />
           <Typography sx={{
             fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-            fontSize: '0.58rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: accent,
+            fontSize: '0.7rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: accent,
           }}>
             Executive Summary
           </Typography>
@@ -384,7 +384,7 @@ function FindingsAndRecommendations({ analysisResult, accent }) {
                 <TipsAndUpdatesIcon sx={{ fontSize: 14, color: accent }} />
                 <Typography sx={{
                   fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-                  fontSize: '0.58rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'text.secondary',
+                  fontSize: '0.7rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary',
                 }}>
                   Key Business Findings
                 </Typography>
@@ -392,7 +392,7 @@ function FindingsAndRecommendations({ analysisResult, accent }) {
               {findings.map((f, i) => (
                 <Box key={i} sx={{ display: 'flex', gap: 1.5, mb: 1.5 }}>
                   <Typography sx={{
-                    fontSize: '0.58rem', fontFamily: '"JetBrains Mono", monospace',
+                    fontSize: '0.7rem', fontFamily: '"JetBrains Mono", monospace',
                     color: accent, flexShrink: 0, fontWeight: 700, mt: 0.12,
                   }}>
                     {String(i + 1).padStart(2, '0')}
@@ -415,7 +415,7 @@ function FindingsAndRecommendations({ analysisResult, accent }) {
                 <TaskAltIcon sx={{ fontSize: 14, color: '#6b8f71' }} />
                 <Typography sx={{
                   fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-                  fontSize: '0.58rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: 'text.secondary',
+                  fontSize: '0.7rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'text.secondary',
                 }}>
                   Strategic Recommendations
                 </Typography>
@@ -432,7 +432,7 @@ function FindingsAndRecommendations({ analysisResult, accent }) {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     bgcolor: 'rgba(107,143,113,0.12)',
                   }}>
-                    <Typography sx={{ fontSize: '0.52rem', fontFamily: '"JetBrains Mono", monospace', color: '#6b8f71', fontWeight: 700 }}>
+                    <Typography sx={{ fontSize: '0.68rem', fontFamily: '"JetBrains Mono", monospace', color: '#6b8f71', fontWeight: 700 }}>
                       {i + 1}
                     </Typography>
                   </Box>
@@ -460,13 +460,13 @@ function RiskAlerts({ anomalies }) {
           <WarningAmberIcon sx={{ fontSize: 14, color: '#c9a84c' }} />
           <Typography sx={{
             fontFamily: '"Raleway", sans-serif', fontWeight: 700,
-            fontSize: '0.58rem', letterSpacing: '0.22em', textTransform: 'uppercase', color: '#c9a84c',
+            fontSize: '0.7rem', letterSpacing: '0.16em', textTransform: 'uppercase', color: '#c9a84c',
           }}>
             Risk Indicators & Attention Areas
           </Typography>
           <Chip
             label={`${anomalies.length} flagged`} size="small"
-            sx={{ bgcolor: 'rgba(201,168,76,0.15)', color: '#c9a84c', fontSize: '0.54rem', height: 16, ml: 0.5 }}
+            sx={{ bgcolor: 'rgba(201,168,76,0.15)', color: '#c9a84c', fontSize: '0.68rem', height: 22, ml: 0.5 }}
           />
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -536,7 +536,7 @@ function DataHealthPanel({ dqResults, accent }) {
           <Typography sx={{ fontFamily: '"Cormorant Garamond", serif', fontSize: '1.55rem', fontWeight: 700, color: scoreColor }}>
             {score}%
           </Typography>
-          <Chip label={statusLabel} size="small" sx={{ bgcolor: `${scoreColor}18`, color: scoreColor, fontSize: '0.58rem', fontWeight: 700 }} />
+          <Chip label={statusLabel} size="small" sx={{ bgcolor: `${scoreColor}20`, color: scoreColor, fontSize: '0.7rem', fontWeight: 700 }} />
         </Box>
       </Box>
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '2px', overflow: 'hidden' }}>
@@ -759,7 +759,7 @@ function HistoryPanel({ accent, onSelect, onClose }) {
           {groups.map(([label, groupItems]) => (
             <Box key={label}>
               <Typography sx={{
-                fontSize: '0.58rem', letterSpacing: '0.2em', textTransform: 'uppercase',
+                fontSize: '0.7rem', letterSpacing: '0.16em', textTransform: 'uppercase',
                 color: 'text.disabled', fontFamily: '"Raleway", sans-serif',
                 mb: 1.25, pl: 0.5,
               }}>
@@ -820,7 +820,7 @@ function HistoryPanel({ accent, onSelect, onClose }) {
                             <Chip
                               label={item.provider}
                               size="small"
-                              sx={{ bgcolor: `${accent}12`, color: accent, fontSize: '0.52rem', height: 14 }}
+                              sx={{ bgcolor: `${accent}1e`, color: accent, fontSize: '0.68rem', height: 22 }}
                             />
                           )}
                         </Box>

@@ -27,9 +27,10 @@ function SectionLabel({ title, badge }) {
         </Typography>
       </Box>
       <Box sx={{
-        px: 1.2, py: 0.3,
-        border: `1px solid ${accent}2e`,
-        fontSize: '0.55rem', letterSpacing: '0.2em',
+        px: 1.4, py: 0.4,
+        border: `1px solid ${accent}38`,
+        borderRadius: '4px',
+        fontSize: '0.68rem', letterSpacing: '0.14em',
         color: 'text.secondary',
         fontFamily: '"Raleway", sans-serif', fontWeight: 700,
       }}>
@@ -45,7 +46,7 @@ export default function Charts({ kpis = {} }) {
 
   const textPrimary = dark ? '#ede8d0' : '#1a1814'
   const textMuted   = dark ? '#5a5040' : '#8a7e6e'
-  const borderColor = dark ? `${accent}14` : `${accent}22`
+  const borderColor = dark ? `${accent}26` : `${accent}32`
   const tickLabelStyle = {
     fontSize: 11,
     fontFamily: '"Raleway", sans-serif',
