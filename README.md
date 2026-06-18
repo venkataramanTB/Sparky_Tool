@@ -99,6 +99,7 @@ Features include:
 - Material UI (MUI)
 - Context API
 - Axios
+- React Three Fiber + Drei + Three.js (3D visualisations)
 
 ## Backend
 
@@ -132,3 +133,40 @@ src/
 ├── AuthContext.jsx
 ├── ThemeContext.jsx
 └── ...
+```
+
+---
+
+## Admin Panel
+
+The Admin panel is gated to admin-role users via Clerk and exposes the following tabs:
+
+| Tab | Feature |
+|---|---|
+| 1–8 | User management, configuration, logs, etc. |
+| 9 | **System Analytics** — 3D Vercel deployment visualisation |
+
+### System Analytics (Tab 9)
+
+An immersive 3D data-space scene built with **React Three Fiber**. Vercel projects appear as glowing wireframe icosahedra; each deployment orbits its project as a coloured sphere. Connecting light-beam edges update dynamically. Clicking a node highlights it and scrolls the deployment detail list below the canvas.
+
+**Layout:** 3D hero canvas (480 px) + glassmorphism KPI strip + deployment list + projects sidebar.
+
+**State colours:** green = READY, red = ERROR, amber = BUILDING/QUEUED, grey = CANCELED.
+
+#### Environment variables required
+
+Add to `frontend/.env` (see `frontend/.env.example`):
+
+```env
+VITE_VERCEL_TOKEN=       # Vercel personal/team token (read-only scope recommended)
+VITE_VERCEL_TEAM_ID=     # Only needed for Vercel team/org accounts
+```
+
+> **Note:** `VITE_` variables are baked into the JS bundle at build time and are visible to anyone who downloads the page. Use a scoped, read-only token.
+
+#### Dependencies
+
+```bash
+npm install three @react-three/fiber @react-three/drei --legacy-peer-deps
+```
