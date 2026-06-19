@@ -8,10 +8,27 @@ import ErrorBoundary from './components/ErrorBoundary'
 import ShortcutsFab from './components/ShortcutsFab'
 import { useAuth } from './AuthContext'
 
-const Settings     = lazy(() => import('./pages/Settings'))
-const Admin        = lazy(() => import('./pages/Admin'))
-const Preferences  = lazy(() => import('./pages/Preferences'))
-const SchedulesPage = lazy(() => import('./pages/SchedulesPage'))
+// Wraps React.lazy so that a stale-deployment 404 on a hashed chunk triggers a
+// one-shot page reload (which fetches fresh HTML + new chunk hashes) instead of
+// crashing the app. The sessionStorage flag prevents infinite reload loops if
+// the module still fails after the reload.
+function lazyWithReload(importFn) {
+  return lazy(() =>
+    importFn().catch((err) => {
+      if (!sessionStorage.getItem('chunk_reload_attempted')) {
+        sessionStorage.setItem('chunk_reload_attempted', '1')
+        window.location.reload()
+        return { default: () => null }
+      }
+      throw err
+    })
+  )
+}
+
+const Settings      = lazyWithReload(() => import('./pages/Settings'))
+const Admin         = lazyWithReload(() => import('./pages/Admin'))
+const Preferences   = lazyWithReload(() => import('./pages/Preferences'))
+const SchedulesPage = lazyWithReload(() => import('./pages/SchedulesPage'))
 
 function PageFallback() {
   return (
