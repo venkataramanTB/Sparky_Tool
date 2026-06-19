@@ -1,6 +1,6 @@
-import { useRef, useState, useMemo } from 'react'
+import { Component, useRef, useState, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Stars, OrbitControls, Html, Line } from '@react-three/drei'
+import { Stars, OrbitControls, Html } from '@react-three/drei'
 
 const STATE_COLOR = {
   READY:    '#6b8f71',
@@ -23,6 +23,25 @@ function spiralPositions(count, center = [0, 0, 0], minR = 1.4, maxR = 3.4) {
   })
 }
 
+// ── Native connection line ─────────────────────────────────────────────────────
+// Uses Three.js core primitives only — avoids @react-three/drei Line which wraps
+// LineMaterial from three/examples and breaks across Three.js minor versions.
+function ConnectionLine({ start, end, color, opacity }) {
+  const positions = useMemo(
+    () => new Float32Array([start[0], start[1], start[2], end[0], end[1], end[2]]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [start[0], start[1], start[2], end[0], end[1], end[2]],
+  )
+  return (
+    <line>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" count={2} array={positions} itemSize={3} />
+      </bufferGeometry>
+      <lineBasicMaterial color={color} transparent opacity={opacity} />
+    </line>
+  )
+}
+
 // ── Project node (wireframe icosahedron, slowly self-rotating) ────────────────
 function ProjectNode({ position, accent }) {
   const mesh = useRef()
@@ -33,7 +52,6 @@ function ProjectNode({ position, accent }) {
         <icosahedronGeometry args={[0.55, 1]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.55} wireframe />
       </mesh>
-      {/* outer glow halo */}
       <mesh>
         <icosahedronGeometry args={[0.7, 1]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.12} wireframe transparent opacity={0.25} />
@@ -53,6 +71,7 @@ function DeployNode({ position, dep, accent, isHighlighted, onHover, onClick }) 
 
   useFrame(({ clock }, dt) => {
     if (!mesh.current) return
+    const delta = dt || 0
     const t = clock.getElapsedTime()
     mesh.current.scale.setScalar(
       hovered || isHighlighted ? 1.5
@@ -68,7 +87,7 @@ function DeployNode({ position, dep, accent, isHighlighted, onHover, onClick }) 
     }
     if (ring.current) {
       ring.current.visible = isHighlighted
-      ring.current.rotation.z += dt * 1.2
+      ring.current.rotation.z += delta * 1.2
     }
   })
 
@@ -84,13 +103,11 @@ function DeployNode({ position, dep, accent, isHighlighted, onHover, onClick }) 
         <meshStandardMaterial color={col} emissive={col} emissiveIntensity={0.25} />
       </mesh>
 
-      {/* Spinning highlight ring */}
       <mesh ref={ring} rotation={[Math.PI / 2, 0, 0]}>
         <torusGeometry args={[0.3, 0.02, 8, 32]} />
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.5} />
       </mesh>
 
-      {/* HTML tooltip */}
       {(hovered || isHighlighted) && (
         <Html center distanceFactor={10} position={[0, 0.42, 0]} style={{ pointerEvents: 'none' }}>
           <div style={{
@@ -146,7 +163,6 @@ function ProjectLabel({ position, name }) {
 function SceneInner({ deployments, projects, accent, highlighted, onSelect }) {
   const [, setHoveredDep] = useState(null)
 
-  // Group deployments by their project name (Vercel deployment.name === project.name)
   const byProject = useMemo(() => {
     const map = {}
     projects.forEach(p => { map[p.name] = [] })
@@ -154,7 +170,6 @@ function SceneInner({ deployments, projects, accent, highlighted, onSelect }) {
       if (map[d.name] !== undefined) {
         map[d.name].push(d)
       } else {
-        // fallback: assign to first project cluster
         const key = Object.keys(map)[0]
         if (key) map[key].push(d)
       }
@@ -162,7 +177,6 @@ function SceneInner({ deployments, projects, accent, highlighted, onSelect }) {
     return map
   }, [deployments, projects])
 
-  // Position projects: single → center, multiple → polygon
   const projPositions = useMemo(() => {
     if (projects.length === 0) return []
     if (projects.length === 1) return [[0, 0, 0]]
@@ -190,8 +204,8 @@ function SceneInner({ deployments, projects, accent, highlighted, onSelect }) {
       />
 
       {projects.map((project, pi) => {
-        const ppos  = projPositions[pi] || [0, 0, 0]
-        const deps  = byProject[project.name] || []
+        const ppos    = projPositions[pi] || [0, 0, 0]
+        const deps    = byProject[project.name] || []
         const dposArr = spiralPositions(deps.length, ppos)
 
         return (
@@ -200,17 +214,16 @@ function SceneInner({ deployments, projects, accent, highlighted, onSelect }) {
             <ProjectLabel position={ppos} name={project.name} />
 
             {deps.map((dep, di) => {
-              const dpos  = dposArr[di] || [ppos[0] + 2, 0, ppos[2]]
-              const isHL  = highlighted === dep.uid
-              const lCol  = isHL ? accent : '#1a2233'
+              const dpos = dposArr[di] || [ppos[0] + 2, 0, ppos[2]]
+              const isHL = highlighted === dep.uid
+              const lCol = isHL ? accent : '#1a2233'
 
               return (
                 <group key={dep.uid}>
-                  <Line
-                    points={[ppos, dpos]}
+                  <ConnectionLine
+                    start={ppos}
+                    end={dpos}
                     color={lCol}
-                    lineWidth={isHL ? 1.5 : 0.5}
-                    transparent
                     opacity={isHL ? 0.85 : 0.28}
                   />
                   <DeployNode
@@ -228,7 +241,6 @@ function SceneInner({ deployments, projects, accent, highlighted, onSelect }) {
         )
       })}
 
-      {/* Fallback when no projects returned but deployments exist */}
       {projects.length === 0 && deployments.length > 0 && (() => {
         const dposArr = spiralPositions(deployments.length, [0, 0, 0])
         return deployments.map((dep, di) => (
@@ -247,21 +259,75 @@ function SceneInner({ deployments, projects, accent, highlighted, onSelect }) {
   )
 }
 
+// ── Error boundary isolating the Canvas from the rest of Admin ─────────────────
+class Scene3DErrorBoundary extends Component {
+  state = { crashed: false }
+
+  static getDerivedStateFromError() {
+    return { crashed: true }
+  }
+
+  componentDidCatch(err) {
+    console.error('[VercelScene3D]', err)
+  }
+
+  render() {
+    if (this.state.crashed) {
+      return (
+        <div style={{
+          width: '100%',
+          height: 480,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#030308',
+          borderRadius: 10,
+          gap: 12,
+        }}>
+          <div style={{ color: 'rgba(180,80,80,0.7)', fontFamily: '"Raleway", sans-serif', fontSize: 13, letterSpacing: '0.06em' }}>
+            3D scene failed to render
+          </div>
+          <button
+            onClick={() => this.setState({ crashed: false })}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(201,168,76,0.4)',
+              color: 'rgba(201,168,76,0.7)',
+              fontFamily: '"Raleway", sans-serif',
+              fontSize: 11,
+              letterSpacing: '0.1em',
+              padding: '4px 14px',
+              cursor: 'pointer',
+              borderRadius: 2,
+            }}
+          >
+            RETRY
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 // ── Public component — wraps the Canvas ───────────────────────────────────────
-export default function VercelScene3D({ deployments, projects, accent, highlighted, onSelect }) {
+export default function VercelScene3D({ deployments = [], projects = [], accent, highlighted, onSelect }) {
   return (
-    <Canvas
-      camera={{ position: [0, 5, 12], fov: 55 }}
-      style={{ width: '100%', height: 480, borderRadius: 10, display: 'block' }}
-      gl={{ antialias: true, alpha: false }}
-    >
-      <SceneInner
-        deployments={deployments}
-        projects={projects}
-        accent={accent}
-        highlighted={highlighted}
-        onSelect={onSelect}
-      />
-    </Canvas>
+    <Scene3DErrorBoundary>
+      <Canvas
+        camera={{ position: [0, 5, 12], fov: 55 }}
+        style={{ width: '100%', height: 480, borderRadius: 10, display: 'block' }}
+        gl={{ antialias: true, alpha: false }}
+      >
+        <SceneInner
+          deployments={deployments}
+          projects={projects}
+          accent={accent}
+          highlighted={highlighted}
+          onSelect={onSelect}
+        />
+      </Canvas>
+    </Scene3DErrorBoundary>
   )
 }
