@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Component, useEffect, useState, useCallback, useMemo, lazy, Suspense } from 'react'
 import {
   Box, Typography, CircularProgress, Grid, Card, CardContent,
   Tabs, Tab, Chip, Alert, Tooltip, IconButton, TextField, InputAdornment,
@@ -53,7 +53,6 @@ import RefreshOutlinedIcon     from '@mui/icons-material/RefreshOutlined'
 import { LineChart, BarChart, PieChart } from '@mui/x-charts'
 import { useAuth } from '../AuthContext'
 import MythicsLoader from '../components/MythicsLoader'
-import VercelScene3D from '../components/VercelScene3D'
 import {
   listAdminStats, listAdminLogs, listAdminUsers, listAdminRuns,
   inviteAdminUser, setUserRole, updateAdminUser, deleteAdminUser,
@@ -66,6 +65,34 @@ import {
   fetchVercelStats,
   formatApiError,
 } from '../api'
+
+// Lazy-loaded so three.js / @react-three/drei never initialise as part of the
+// Admin chunk — their module-level code runs only when the user opens tab 9.
+const VercelScene3D = lazy(() => import('../components/VercelScene3D'))
+
+// Inline error boundary that catches both chunk-load failures and render errors
+// from the 3D scene, keeping the rest of Admin working if the Canvas crashes.
+class SceneBoundary extends Component {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(err) { console.error('[VercelScene3D load]', err) }
+  render() {
+    if (this.state.failed) {
+      return (
+        <Box sx={{
+          height: 480, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          bgcolor: '#030308', borderRadius: '10px',
+          border: '1px solid rgba(180,80,80,0.25)',
+        }}>
+          <Typography sx={{ fontFamily: '"Raleway", sans-serif', fontSize: '0.82rem', color: 'rgba(160,150,140,0.5)', letterSpacing: '0.06em' }}>
+            3D scene unavailable
+          </Typography>
+        </Box>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // ── tiny helpers ──────────────────────────────────────────────────────────────
 
@@ -2403,13 +2430,21 @@ export default function Admin() {
                   boxShadow: `0 0 40px ${accent}12, inset 0 0 60px rgba(0,0,0,0.5)`,
                   position: 'relative',
                 }}>
-                  <VercelScene3D
-                    deployments={vercel.deployments}
-                    projects={vercel.projects}
-                    accent={accent}
-                    highlighted={highlighted}
-                    onSelect={handleSceneSelect}
-                  />
+                  <SceneBoundary>
+                    <Suspense fallback={
+                      <Box sx={{ height: 480, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#030308' }}>
+                        <CircularProgress size={24} sx={{ color: accent }} />
+                      </Box>
+                    }>
+                      <VercelScene3D
+                        deployments={vercel.deployments}
+                        projects={vercel.projects}
+                        accent={accent}
+                        highlighted={highlighted}
+                        onSelect={handleSceneSelect}
+                      />
+                    </Suspense>
+                  </SceneBoundary>
                   <Box sx={{ position: 'absolute', bottom: 12, left: 16, display: 'flex', gap: 2, flexWrap: 'wrap', pointerEvents: 'none' }}>
                     {[['READY','#6b8f71'],['ERROR','#b45050'],['BUILDING','#c9a84c'],['CANCELED','#555566']].map(([label, col]) => (
                       <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
