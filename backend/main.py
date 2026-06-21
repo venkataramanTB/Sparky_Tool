@@ -113,6 +113,23 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("X-XSS-Protection", "1; mode=block")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.accounts.dev https://*.clerk.accounts.dev; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: blob: https:; "
+        "connect-src 'self' https://api.clerk.com https://*.clerk.accounts.dev wss:; "
+        "frame-ancestors 'none';",
+    )
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), payment=()",
+    )
+    # Prevent browsers and proxies from caching API responses that contain user data
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+        response.headers.setdefault("Pragma", "no-cache")
     return response
 
 
@@ -123,6 +140,7 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     elapsed = round((_time.time() - t0) * 1000)
     path = request.url.path
+    response.headers.setdefault("X-Request-ID", request_id)
 
     _silent = {"/favicon.ico", "/api/ping", "/api/health"}
     if not path.startswith("/assets/") and path not in _silent:
