@@ -1,3 +1,4 @@
+import re as _re
 import time
 import httpx
 from config import get_settings
@@ -52,7 +53,42 @@ def _build_auth(settings):
     return None, {}
 
 
-def trigger_engine(_settings=None, max_retries: int = 6, retry_delay: int = 10) -> dict:
+def _reauth(client: httpx.Client, settings) -> None:
+    """Recover from a session expiry (302 redirect) during polling.
+
+    Clears stale cookies so the next request re-sends credentials and lets
+    PeopleSoft issue a fresh session.  If a dedicated login endpoint is
+    configured (ps_login_endpoint), an explicit login POST is performed first.
+    """
+    client.cookies.clear()
+    login_ep = getattr(settings, "ps_login_endpoint", "") or ""
+    if login_ep:
+        login_url = _build_url(settings.ps_base_url, login_ep)
+        auth, extra_headers = _build_auth(settings)
+        try:
+            r = client.post(login_url, auth=auth, headers=extra_headers, follow_redirects=True)
+            log.info("Re-auth via login endpoint  HTTP %s", r.status_code)
+        except Exception as exc:
+            log.warning("Re-auth login request failed (will still retry poll): %s", exc)
+    else:
+        log.info(
+            "Session cookies cleared — credentials will be re-sent on next poll request "
+            "(set ps_login_endpoint in Settings to use an explicit login step)"
+        )
+
+
+def trigger_engine(
+    _settings=None,
+    max_retries: int = 6,
+    retry_delay: int = 10,
+    *,
+    client: httpx.Client | None = None,
+) -> dict:
+    """POST to the PeopleSoft trigger endpoint and return the JSON response.
+
+    Pass *client* to share a session (and its cookie jar) with :func:`poll_status`.
+    When *client* is None a private client is created and closed automatically.
+    """
     settings = _settings or get_settings()
     url = _build_url(settings.ps_base_url, settings.ps_endpoint)
     auth, headers = _build_auth(settings)
@@ -60,10 +96,10 @@ def trigger_engine(_settings=None, max_retries: int = 6, retry_delay: int = 10) 
 
     log.info("Triggering PeopleSoft engine  POST %s  (process: %s)", url, settings.ps_process_name)
 
-    # PeopleSoft Integration Gateway returns 5xx while the process is still
-    # being queued / the service is starting up — same as during poll_status.
-    # Retry up to max_retries times before treating the error as fatal.
-    with httpx.Client(timeout=300, follow_redirects=False) as client:
+    _own_client = client is None
+    if _own_client:
+        client = httpx.Client(timeout=300, follow_redirects=False)
+    try:
         for attempt in range(1, max_retries + 1):
             t0 = time.time()
             response = client.post(url, auth=auth, headers=headers, json=body)
@@ -116,15 +152,29 @@ def trigger_engine(_settings=None, max_retries: int = 6, retry_delay: int = 10) 
             data = response.json()
             log.info("Trigger complete — InstanceID: %s", data.get("InstanceID", "(none)"))
             return data
+    finally:
+        if _own_client:
+            client.close()
 
     raise TimeoutError(f"PeopleSoft trigger did not succeed after {max_retries} attempts")
 
 
-def poll_status(instance_id: str, _settings=None, max_wait: int = 600, poll_interval: int = 5) -> dict:
+def poll_status(
+    instance_id: str,
+    _settings=None,
+    max_wait: int = 600,
+    poll_interval: int = 5,
+    *,
+    client: httpx.Client | None = None,
+) -> dict:
+    """Poll the PeopleSoft status endpoint until the process completes.
+
+    Pass *client* (the same one used for :func:`trigger_engine`) so that session
+    cookies from the trigger response are reused here.  If the session expires
+    mid-poll (PeopleSoft returns a 302 redirect), the session is renewed and the
+    request retried once before raising an error.
+    """
     settings = _settings or get_settings()
-    # Strip any {InstanceID} or similar template placeholders users may have
-    # copied verbatim from Postman URLs — e.g. ".../API/{InstanceID}" → ".../API"
-    import re as _re
     status_ep = _re.sub(r"/?\{[^}]+\}$", "", (settings.ps_status_endpoint or "").rstrip("/"))
     base_url = _build_url(settings.ps_base_url, status_ep)
     url = f"{base_url.rstrip('/')}/{instance_id}" if instance_id else base_url.rstrip("/")
@@ -132,13 +182,35 @@ def poll_status(instance_id: str, _settings=None, max_wait: int = 600, poll_inte
     log.info("Polling status  GET %s  (max wait: %ds, interval: %ds)", url, max_wait, poll_interval)
     elapsed = 0
 
-    with httpx.Client(timeout=30, follow_redirects=False) as client:
+    _own_client = client is None
+    if _own_client:
+        client = httpx.Client(timeout=30, follow_redirects=False)
+    try:
         while elapsed < max_wait:
             time.sleep(poll_interval)
             elapsed += poll_interval
             t0 = time.time()
-            response = client.get(url, auth=auth, headers=headers)
+            response = client.get(url, auth=auth, headers=headers, timeout=30)
             rtt = round((time.time() - t0) * 1000)
+
+            # 302 during polling = PeopleSoft session expired.
+            # Re-authenticate and retry this one poll request.
+            if response.is_redirect:
+                location = response.headers.get("location", "")
+                log.warning(
+                    "Poll [%3ds elapsed] session expired (302 → %s) — re-authenticating and retrying",
+                    elapsed, location,
+                )
+                _reauth(client, settings)
+                response = client.get(url, auth=auth, headers=headers, timeout=30)
+                if response.is_redirect:
+                    raise httpx.HTTPStatusError(
+                        f"PeopleSoft session could not be renewed — still redirecting after re-auth "
+                        f"(redirect → {response.headers.get('location', '')}). "
+                        f"Check credentials in Settings.",
+                        request=response.request,
+                        response=response,
+                    )
 
             # PeopleSoft returns 5xx while the process is still queued or starting up.
             # Even error bodies like "Method GET not found" are transient — PS emits them
@@ -172,6 +244,9 @@ def poll_status(instance_id: str, _settings=None, max_wait: int = 600, poll_inte
             if report_id or status.lower() == "success":
                 log.info("Poll complete — ReportID: %s  STATUS: %s", report_id, status)
                 return data
+    finally:
+        if _own_client:
+            client.close()
 
     raise TimeoutError(
         f"Process did not complete after {max_wait}s (Instance ID: {instance_id})"

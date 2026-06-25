@@ -78,11 +78,14 @@ def run_one_engine(config, engine_process_name, engine_label, s, user, config_id
     report_id   = ""
     file_name   = ""
 
+    # One shared HTTP client for trigger + poll so PeopleSoft session cookies
+    # issued during the trigger POST are reused by the poll GETs automatically.
+    _ps_client = httpx.Client(timeout=300, follow_redirects=False)
     try:
         # ── Step 1: Trigger ────────────────────────────────────────────────────
         t1 = _time.time()
         try:
-            trigger_result = trigger_engine(_settings=s_eng)
+            trigger_result = trigger_engine(_settings=s_eng, client=_ps_client)
         except httpx.HTTPStatusError as exc:
             run_log.failed_step = "trigger"
             raise HTTPException(502, f"PeopleSoft API error: {exc}")
@@ -109,7 +112,7 @@ def run_one_engine(config, engine_process_name, engine_label, s, user, config_id
         if s_eng.ps_status_endpoint and instance_id:
             t2 = _time.time()
             try:
-                status_result = poll_status(instance_id, _settings=s_eng)
+                status_result = poll_status(instance_id, _settings=s_eng, client=_ps_client)
                 report_id = str(status_result.get("ReportID", ""))
                 file_name  = str(status_result.get("FileName", ""))
             except TimeoutError as exc:
@@ -279,6 +282,8 @@ def run_one_engine(config, engine_process_name, engine_label, s, user, config_id
             "run_id": run_log.id, "status": "error", "error": str(exc.detail),
             "row_count": 0, "kpis": {}, "chart_data": [], "dq_results": [],
         }
+    finally:
+        _ps_client.close()
 
 
 def run_config_engines(config_id: int, user, db, request=None) -> dict:
