@@ -1,3 +1,4 @@
+import gc
 import io
 import math
 import re
@@ -169,9 +170,14 @@ def parse_and_compute(csv_bytes: bytes) -> dict[str, Any]:
                     for k, v in df[col].value_counts().head(10).items()
                 },
             }
+    rows    = df.astype(object).where(pd.notna(df), None).to_dict(orient='records')
+    columns = list(df.columns)
+    n_rows  = len(df)
+    del df
+    gc.collect()
     return {
-        'kpis': kpis,
-        'rows': df.astype(object).where(pd.notna(df), None).to_dict(orient='records'),
-        'columns': list(df.columns),
-        'row_count': len(df),
+        'kpis':      kpis,
+        'rows':      rows,
+        'columns':   columns,
+        'row_count': n_rows,
     }

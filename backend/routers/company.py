@@ -16,9 +16,18 @@ from logger import get_logger
 log = get_logger("company")
 router = APIRouter(prefix="/api/v2/company", tags=["company"])
 
-_CACHE_MAX    = 500                        # evict oldest when exceeded
+_CACHE_MAX    = 200                        # evict oldest when exceeded
 _logo_cache:  dict[str, bytes | None] = {} # None means confirmed-missing (404)
 _info_cache:  dict[str, dict]         = {}
+
+_gemini_client = None  # singleton — created lazily, reused across requests
+
+
+def _get_gemini_client(api_key: str):
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = _genai.Client(api_key=api_key, http_options={"timeout": 15_000})
+    return _gemini_client
 
 _PERSONAL_DOMAINS = {
     "gmail.com", "googlemail.com", "yahoo.com", "outlook.com",
@@ -129,9 +138,9 @@ async def get_company_info(
         raise HTTPException(503, "GEMINI_API_KEY not configured")
 
     try:
-        gc = _genai.Client(api_key=api_key, http_options={"timeout": 15_000})
+        gc = _get_gemini_client(api_key)
         response = gc.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-flash",
             contents=_INFO_PROMPT.format(domain=domain),
             config=_genai_types.GenerateContentConfig(
                 temperature=0.1,

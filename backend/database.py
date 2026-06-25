@@ -320,8 +320,8 @@ def _init():
         url,
         connect_args=connect_args,
         pool_pre_ping=True,     # validate connections before handing them out
-        pool_size=5,
-        max_overflow=10,
+        pool_size=2,
+        max_overflow=3,
         pool_recycle=120,       # recycle every 2 min — safely under Neon's 5-min idle timeout
         pool_timeout=30,        # raise after 30 s if no connection available
     )

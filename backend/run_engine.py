@@ -2,6 +2,7 @@
 Run-execution logic extracted from main.py.
 Imported by both the HTTP endpoint (main.py) and the scheduler.
 """
+import gc as _gc
 import time as _time
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -230,6 +231,10 @@ def run_one_engine(config, engine_process_name, engine_label, s, user, config_id
             dq_results = run_checks(db=db, config_id=config_id, run_log_id=run_log.id, csv_bytes=csv_bytes)
         except Exception as exc:
             log.warning("DQ checks failed (non-fatal): %s", exc)
+        finally:
+            # Release the raw CSV bytes — parse and DQ checks are done with it
+            del csv_bytes
+            _gc.collect()
 
         duration_ms = int((_time.time() - start) * 1000)
         run_log.status       = "success"
