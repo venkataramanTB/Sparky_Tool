@@ -1,4 +1,5 @@
 import asyncio as _asyncio
+import collections as _collections
 import httpx
 import os as _os
 import time as _time
@@ -106,6 +107,19 @@ app.add_middleware(
 )
 
 
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
+    "style-src 'self' 'unsafe-inline' https:; "
+    "font-src 'self' data: https:; "
+    "img-src 'self' data: blob: https:; "
+    "connect-src 'self' https: wss: ws:; "
+    "frame-ancestors 'none'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self';"
+)
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -113,7 +127,57 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("X-XSS-Protection", "1; mode=block")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Content-Security-Policy", _CSP)
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    )
+    response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
     return response
+
+
+_RL_WINDOW = 60       # seconds per window
+_RL_MAX    = 300      # max requests per window per IP
+_RL_EVICT  = 1_000    # evict empty buckets every N checked requests
+_rl_store: dict[str, _collections.deque] = {}
+_rl_checked = 0
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    global _rl_checked
+    path = request.url.path
+    # Skip static assets and the no-cost ping
+    if path.startswith("/assets/") or path == "/api/ping":
+        return await call_next(request)
+
+    ip = request.client.host if request.client else "127.0.0.1"
+    now = _time.time()
+    cutoff = now - _RL_WINDOW
+
+    dq = _rl_store.get(ip)
+    if dq is None:
+        dq = _collections.deque()
+        _rl_store[ip] = dq
+
+    while dq and dq[0] < cutoff:
+        dq.popleft()
+
+    _rl_checked += 1
+    if _rl_checked % _RL_EVICT == 0:
+        for _k in [k for k, v in _rl_store.items() if not v]:
+            del _rl_store[_k]
+
+    if len(dq) >= _RL_MAX:
+        return Response(
+            content='{"detail":"Rate limit exceeded — retry after 60 s."}',
+            status_code=429,
+            media_type="application/json",
+            headers={"Retry-After": "60"},
+        )
+
+    dq.append(now)
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -211,8 +275,8 @@ async def _emit_wide_event(
             )
         finally:
             db.close()  # always runs — no more session leaks
-    except Exception:
-        pass  # wide events are best-effort, never crash the request
+    except Exception as _we_exc:
+        log.debug("Wide event write failed (best-effort): %s", _we_exc)
 
 
 # ── v2 routers ────────────────────────────────────────────────────────────────

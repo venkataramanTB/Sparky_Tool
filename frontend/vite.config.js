@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    base: './', // 👈 ADD THIS LINE HERE
+    base: './',
     plugins: [react()],
     server: {
       cors: true,
@@ -16,6 +16,26 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           ws: true,
           headers: { 'Access-Control-Allow-Origin': '*' },
+        },
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-mui': [
+              '@mui/material',
+              '@mui/icons-material',
+              '@mui/x-data-grid',
+              '@mui/x-charts',
+              '@emotion/react',
+              '@emotion/styled',
+            ],
+            'vendor-three': ['three'],
+            'vendor-clerk': ['@clerk/clerk-react'],
+            'vendor-data': ['axios', '@tanstack/react-table'],
+          },
         },
       },
     },
