@@ -201,6 +201,8 @@ def _migrate_columns(engine) -> None:
         )""",
         "CREATE INDEX IF NOT EXISTS idx_run_outputs_user_id ON run_outputs (user_id)",
         "CREATE INDEX IF NOT EXISTS idx_run_outputs_created  ON run_outputs (created_at)",
+        # Composite index for the common list_runs query pattern: filter by user, sort by date
+        "CREATE INDEX IF NOT EXISTS idx_run_logs_user_started ON run_logs (user_id, started_at DESC)",
         # ── scheduled_runs ────────────────────────────────────────────────────────
         """CREATE TABLE IF NOT EXISTS scheduled_runs (
             id            SERIAL PRIMARY KEY,

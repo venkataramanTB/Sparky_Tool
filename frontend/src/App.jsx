@@ -14,14 +14,20 @@ import { useAuth } from './AuthContext'
 // the module still fails after the reload.
 function lazyWithReload(importFn) {
   return lazy(() =>
-    importFn().catch((err) => {
-      if (!sessionStorage.getItem('chunk_reload_attempted')) {
-        sessionStorage.setItem('chunk_reload_attempted', '1')
-        window.location.reload()
-        return { default: () => null }
-      }
-      throw err
-    })
+    importFn()
+      .then((mod) => {
+        // Clear the flag so a future stale-chunk error still triggers a reload
+        sessionStorage.removeItem('chunk_reload_attempted')
+        return mod
+      })
+      .catch((err) => {
+        if (!sessionStorage.getItem('chunk_reload_attempted')) {
+          sessionStorage.setItem('chunk_reload_attempted', '1')
+          window.location.reload()
+          return { default: () => null }
+        }
+        throw err
+      })
   )
 }
 

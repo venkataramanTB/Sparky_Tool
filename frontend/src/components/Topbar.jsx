@@ -101,6 +101,11 @@ function NavPill({ icon: Icon, label, active, onClick, accent }) {
       onClick={handleClick}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      aria-current={active ? 'page' : undefined}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } }}
       sx={{
         position: 'relative',
         display: 'flex', alignItems: 'center',
@@ -109,6 +114,12 @@ function NavPill({ icon: Icon, label, active, onClick, accent }) {
         bgcolor: hovered ? `${accent}0e` : 'transparent',
         transition: 'background 0.15s ease',
         transformOrigin: 'center bottom',
+        outline: 'none',
+        '&:focus-visible': {
+          outline: `2px solid ${accent}`,
+          outlineOffset: '-2px',
+          borderRadius: '4px',
+        },
       }}
     >
       <Icon sx={{

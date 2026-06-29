@@ -183,15 +183,15 @@ export default function Dashboard() {
     }
   }, [runs])
 
-  const handleRunsViewChange = (v) => {
+  const handleRunsViewChange = useCallback((v) => {
     setRunsView(v)
     localStorage.setItem('dashboard_runs_view', v)
-  }
+  }, [])
 
-  const handleDashTabChange = (_, v) => {
+  const handleDashTabChange = useCallback((_, v) => {
     setDashTab(v)
     localStorage.setItem('dashboard_tab', String(v))
-  }
+  }, [])
 
   const downloadTabPdf = useCallback(async () => {
     setPdfTabLoading(true)
@@ -265,7 +265,7 @@ export default function Dashboard() {
     return () => clearInterval(id)
   }, [running, refreshRuns])
 
-  const handleRun = async () => {
+  const handleRun = useCallback(async () => {
     if (!activeConfigId) { setError('Select a configuration first.'); return }
     setRunning(true)
     setError(null)
@@ -282,7 +282,7 @@ export default function Dashboard() {
     } finally {
       setRunning(false)
     }
-  }
+  }, [activeConfigId, token, refreshRuns])
 
   const handleAnalysisSelect = useCallback(async (item) => {
     setAnalysisLoadingId(item.id)

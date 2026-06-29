@@ -149,10 +149,8 @@ def get_current_user(
     email, first_name, last_name = _extract_user_info(payload)
 
     # Upsert: INSERT … ON CONFLICT (id) DO UPDATE last_seen_at.
-    # This is atomic and handles concurrent first-logins without a race condition.
-    existing = db.query(User).filter(User.id == user_id).first()
-    is_new = existing is None
-
+    # Atomic — handles concurrent first-logins without a race condition.
+    # Two queries (upsert + select) instead of three (select + upsert + select).
     stmt = (
         pg_insert(User)
         .values(
@@ -176,6 +174,10 @@ def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(500, "User record missing after upsert")
+
+    # Detect new registration: created_at and last_seen_at are both set to `now`
+    # on INSERT; on UPDATE only last_seen_at changes, so created_at will differ.
+    is_new = abs((user.created_at - now).total_seconds()) < 2 if user.created_at else False
 
     # Cache the verified identity on request.state so the wide-event middleware
     # can read it without re-parsing or re-verifying the JWT.
