@@ -6,13 +6,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: './',
-
     plugins: [react()],
 
     server: {
       host: '0.0.0.0',
       port: Number(process.env.PORT) || 8080,
-      strictPort: true,
+
+      // 👇 Add this
+      allowedHosts: true,
 
       cors: true,
 
