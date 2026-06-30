@@ -9,7 +9,7 @@ WORKDIR /app
 # Frontend
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend
-RUN npm install
+RUN npm install --legacy-peer-deps
 COPY frontend .
 
 # Backend
