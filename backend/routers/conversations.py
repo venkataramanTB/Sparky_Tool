@@ -155,7 +155,11 @@ def admin_list_conversations(
         .order_by(AiConversation.updated_at.desc())
         .offset(offset).limit(limit).all()
     )
-    user_map = {u.id: u.email for u in db.query(User).all()}
+    user_ids = {c.user_id for c in convs}
+    user_map = {
+        u.id: u.email
+        for u in db.query(User.id, User.email).filter(User.id.in_(user_ids)).all()
+    }
     return {
         "total": total,
         "items": [
